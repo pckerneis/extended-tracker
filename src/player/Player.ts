@@ -3,16 +3,21 @@ import {MidiOutput} from '../midi/MidiOutput';
 
 export class Player {
 
-  public static play(codeSource: CodeProvider, output: MidiOutput, onEnded: Function): void {
+  public static play(codeSource: CodeProvider, output: MidiOutput, onEnded: Function, onStepPlay: Function): void {
     const player = new Player();
-    player.doPlay(codeSource, output, onEnded);
+    player.doPlay(codeSource, output, onEnded, onStepPlay);
   }
 
-  private doPlay(codeSource: CodeProvider, output: MidiOutput, onEnded: Function): void {
-    let steps = Interpreter.interpret(codeSource.code).steps;
-    let position = 0;
+  private doPlay(codeSource: CodeProvider, output: MidiOutput, onEnded: Function, onStepPlay: Function): void {
+    const result = Interpreter.interpret(codeSource.code);
 
-    console.log(steps);
+    if (result == null) {
+      onEnded();
+      return;
+    }
+
+    let steps = result.steps;
+    let position = 0;
 
     const handler = () => {
       const step = steps[position];
@@ -26,9 +31,12 @@ export class Player {
 
         if (step.jump != null) {
           const messageSequence = Interpreter.interpret(codeSource.code);
-          steps = messageSequence.steps;
 
-          const jumpStep = steps.find(s => s.flag.name === step.jump.name);
+          if (messageSequence != null) {
+            steps = messageSequence.steps;
+          }
+
+          const jumpStep = steps.find(s => s.flag?.name === step.jump.name);
           const jumpPosition = steps.indexOf(jumpStep);
 
           if (jumpPosition >= 0) {
@@ -50,6 +58,12 @@ export class Player {
           });
         }
       }
+
+      onStepPlay({
+        sequenceName: 'Program',  // TODO
+        stepNumber: position,
+        messagesCount: step.messages?.length,
+      });
 
       position++;
 

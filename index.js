@@ -19,6 +19,24 @@ if (!outputPortCount) {
   return 0;
 }
 
+let wroteOnce = false;
+
+function onStepPlayed(stepInfo) {
+  const sequenceName = stepInfo.sequenceName;
+  const stepNumber = stepInfo.stepNumber;
+  const messageBar = new Array(stepInfo.messagesCount).fill('#').join('');
+  const string = `${sequenceName}[${stepNumber}] ${messageBar} `;
+
+  if (! wroteOnce) {
+    wroteOnce = true;
+  } else {
+    process.stdout.clearLine(0);
+  }
+
+  process.stdout.cursorTo(0);
+  process.stdout.write(string);
+}
+
 let foundFile;
 let foundOutput;
 const codeSource = {};
@@ -72,7 +90,7 @@ async function main() {
 
 function runProgram() {
   codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.play(codeSource, new MidiOutput(output), onProgramEnded);
+  Player.play(codeSource, new MidiOutput(output), onProgramEnded, onStepPlayed);
 }
 
 function printAvailableMidiOutputDevices() {
