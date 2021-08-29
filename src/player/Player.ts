@@ -51,7 +51,7 @@ export class Player {
           step.messages.forEach(message => {
             let {p, v} = message;
 
-            if (!isNaN(p)) {
+            if (!isNaN(p) && p >= 0 && p < 128) {
               v = Math.min(Math.max(0, v), 127);
               output.noteOn(p, v);
             }
