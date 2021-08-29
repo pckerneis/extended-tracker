@@ -10,8 +10,22 @@ export interface Message {
     [paramName: string]: any;
 }
 
+export interface FlagMessage {
+    name: string;
+}
+
+export interface JumpMessage {
+    name: string;
+}
+
+export interface Step {
+    messages?: Message[];
+    flag?: FlagMessage;
+    jump?: JumpMessage;
+}
+
 export interface MessageSequence {
-    steps: Message[][];
+    steps: Step[];
 }
 
 export class Interpreter {
@@ -43,16 +57,23 @@ export class Interpreter {
         }
 
         const programDeclaration = this.findDeclaration('Program');
-        const steps: {}[][] = [];
+        const steps: Step[] = [];
 
         if (programDeclaration && programDeclaration.value.kind === 'SEQUENCE') {
             const programSequence = programDeclaration.value as Sequence;
 
-            programSequence.expressions.forEach(channels => {
-                const paramMaps: {}[] = [];
+            programSequence.expressions.forEach(channelsOrFlagOrJump => {
 
-                if (channels.kind === 'CHANNELS') {
-                    channels.channels.forEach((params, channelIndex) => {
+                if (channelsOrFlagOrJump.kind === 'FLAG') {
+                    const flag = ({name: channelsOrFlagOrJump.name.lexeme});
+                    steps.push({flag});
+                } else if (channelsOrFlagOrJump.kind === 'JUMP') {
+                    const jump = {name: channelsOrFlagOrJump.name.lexeme};
+                    steps.push({jump});
+                } else if (channelsOrFlagOrJump.kind === 'CHANNELS') {
+                    const messages: Message[] = [];
+
+                    channelsOrFlagOrJump.channels.forEach((params, channelIndex) => {
                         const paramMap = {
                             i: channelIndex,
                         };
@@ -65,11 +86,11 @@ export class Interpreter {
                             });
                         }
 
-                        paramMaps.push(paramMap);
+                        messages.push(paramMap);
                     });
-                }
 
-                steps.push(paramMaps);
+                    steps.push({messages});
+                }
             });
         }
 

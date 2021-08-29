@@ -1,19 +1,18 @@
-import { Token, TokenType } from '../scanner/tokens';
-import { Expr } from './Ast';
+import {Token, TokenType} from '../scanner/tokens';
+import {Expr} from './Ast';
 
 export class Parser {
   private current: number = 0;
 
-  private readonly sequenceStartOperator  = TokenType.LEFT_BRACKET;
-  private readonly sequenceEndOperator    = TokenType.RIGHT_BRACKET;
-  private readonly sequenceSeparators     = [TokenType.SEMICOLON, TokenType.NEW_LINE];
+  private readonly sequenceStartOperator = TokenType.LEFT_BRACKET;
+  private readonly sequenceEndOperator = TokenType.RIGHT_BRACKET;
+  private readonly sequenceSeparators = [TokenType.SEMICOLON, TokenType.NEW_LINE];
 
-  private readonly channelSeparator       = TokenType.PIPE;
-  private readonly paramSeparator         = TokenType.COMMA;
+  private readonly channelSeparator = TokenType.PIPE;
+  private readonly paramSeparator = TokenType.COMMA;
 
-  // private readonly enterToken             = TokenType.LESS;
-  // private readonly exitToken              = TokenType.GREATER;
-  // private readonly breakToken             = TokenType.DOLLAR;
+  private readonly flagToken = TokenType.DASH;
+  private readonly jumpToken = TokenType.DOLLAR;
 
   constructor(public readonly tokens: Token[]) {
   }
@@ -100,12 +99,38 @@ export class Parser {
         break;
       }
 
-      const channelList = this.channelList();
+      if (this.match(this.jumpToken)) {
+        const jumpToken = this.previous();
 
-      expressions.push({
-        kind: 'CHANNELS',
-        channels: channelList,
-      });
+        if (this.match(TokenType.IDENTIFIER)) {
+          expressions.push({
+            kind: 'JUMP',
+            jumpToken,
+            name: this.previous(),
+          });
+        } else {
+          throw new Error('Expected flag name after ' + this.jumpToken);
+        }
+      } else if (this.match(this.flagToken)) {
+        const flagToken = this.previous();
+
+        if (this.match(TokenType.IDENTIFIER)) {
+          expressions.push({
+            kind: 'FLAG',
+            flagToken,
+            name: this.previous(),
+          });
+        } else {
+          throw new Error('Expected flag name after ' + this.flagToken);
+        }
+      } else {
+        const channelList = this.channelList();
+
+        expressions.push({
+          kind: 'CHANNELS',
+          channels: channelList,
+        });
+      }
     } while (this.match(...this.sequenceSeparators));
 
     this.consumeNewLines();
@@ -114,24 +139,24 @@ export class Parser {
   }
 
   private channelList(): Expr[] {
-    const channels: Expr[] = [];
+      const channels: Expr[] = [];
 
-    do {
-      if (this.check(TokenType.NEW_LINE)) {
-        break;
-      }
+      do {
+        if (this.check(TokenType.NEW_LINE)) {
+          break;
+        }
 
-      const params = this.paramList();
-      if (params != null) {
-        channels.push({
-          kind: 'PARAMS',
-          params,
+        const params = this.paramList();
+        if (params != null) {
+          channels.push({
+            kind: 'PARAMS',
+            params,
 
-        });
-      }
-    } while (this.match(this.channelSeparator));
+          });
+        }
+      } while (this.match(this.channelSeparator));
 
-    return channels;
+      return channels;
   }
 
   private paramList(): Expr[] {
@@ -183,7 +208,7 @@ export class Parser {
       this.consumeNewLines();
       const sequence = this.sequence();
       const endToken = this.previous();
-      
+
       this.consumeNewLines();
 
       return {

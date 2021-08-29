@@ -1,45 +1,45 @@
-import { Assign, Sequence } from '../../src/parser/Ast';
-import { Parser } from '../../src/parser/Parser';
-import { Scanner } from '../../src/scanner/Scanner';
+import {Assign, Flag, Sequence} from '../../src/parser/Ast';
+import {Parser} from '../../src/parser/Parser';
+import {Scanner} from '../../src/scanner/Scanner';
 
 test('should parse whitespace', () => {
-    const testCodes = [
-        ``,
-        ` `,
-        `   
+  const testCodes = [
+    ``,
+    ` `,
+    `   
         `,
-        `
+    `
         
         
         `
-    ];
+  ];
 
-    testCodes.forEach((code) => {
-        const tokens = Scanner.scan(code);
-        const exprs = Parser.parse(tokens);
-        expect(exprs.length).toBe(0);
-    });
+  testCodes.forEach((code) => {
+    const tokens = Scanner.scan(code);
+    const exprs = Parser.parse(tokens);
+    expect(exprs.length).toBe(0);
+  });
 });
 
 test('should parse an empty sequence declaration', () => {
-    const code = `mySeq = []`;
-    const tokens = Scanner.scan(code);
-    const exprs = Parser.parse(tokens);
-    
-    expect(exprs.length).toEqual(1);
-    expect(exprs[0].kind).toEqual('ASSIGN');
-    
-    const assign = exprs[0] as Assign;
+  const code = `mySeq = []`;
+  const tokens = Scanner.scan(code);
+  const exprs = Parser.parse(tokens);
 
-    expect(assign.assignee.lexeme).toEqual('mySeq');
+  expect(exprs.length).toEqual(1);
+  expect(exprs[0].kind).toEqual('ASSIGN');
 
-    expect(assign.value.kind).toEqual('SEQUENCE');
-    const sequence = assign.value as Sequence;
-    expect(sequence.expressions.length).toBe(0);
+  const assign = exprs[0] as Assign;
+
+  expect(assign.assignee.lexeme).toEqual('mySeq');
+
+  expect(assign.value.kind).toEqual('SEQUENCE');
+  const sequence = assign.value as Sequence;
+  expect(sequence.expressions.length).toBe(0);
 });
 
 test('should parse a sequence declaration', () => {
-    const testCodes = [`
+  const testCodes = [`
     
     mySeq = [
         p: 12 | p: 14
@@ -54,31 +54,55 @@ test('should parse a sequence declaration', () => {
     ]
     
     `,
-    ];
+  ];
 
-    // Should this be valid ?
-    /*
-    `mySeq = [ p: 12 | p: 14 ; p: 14 ;
-        p: 16 | p: 14
-        ;
-    ]`
-    */
+  // Should this be valid ?
+  /*
+  `mySeq = [ p: 12 | p: 14 ; p: 14 ;
+      p: 16 | p: 14
+      ;
+  ]`
+  */
 
-    testCodes.forEach(code => {
-        const tokens = Scanner.scan(code);
-        const exprs = Parser.parse(tokens);
-    
-        expect(exprs.length).toEqual(1);
-        expect(exprs[0].kind).toEqual('ASSIGN');
-        
-        const assign = exprs[0] as Assign;
-    
-        expect(assign.value.kind).toEqual('SEQUENCE');
-    
-        const sequence = assign.value as Sequence;
-        expect(sequence.expressions.length).toBe(3);
-    
-        sequence.expressions.forEach(expr => expect(expr.kind).toEqual('CHANNELS'));
-    });
+  testCodes.forEach(code => {
+    const tokens = Scanner.scan(code);
+    const exprs = Parser.parse(tokens);
 
+    expect(exprs.length).toEqual(1);
+    expect(exprs[0].kind).toEqual('ASSIGN');
+
+    const assign = exprs[0] as Assign;
+
+    expect(assign.value.kind).toEqual('SEQUENCE');
+
+    const sequence = assign.value as Sequence;
+    expect(sequence.expressions.length).toBe(3);
+
+    sequence.expressions.forEach(expr => expect(expr.kind).toEqual('CHANNELS'));
+  });
+
+});
+
+
+test('should parse flags', () => {
+  const testCode = `Program = [
+        # flagName
+        ]`;
+
+    const tokens = Scanner.scan(testCode);
+    const exprs = Parser.parse(tokens);
+
+    expect(exprs.length).toEqual(1);
+    expect(exprs[0].kind).toEqual('ASSIGN');
+
+    const assign = exprs[0] as Assign;
+
+    expect(assign.value.kind).toEqual('SEQUENCE');
+
+    const sequence = assign.value as Sequence;
+    expect(sequence.expressions.length).toBe(1);
+    expect(sequence.expressions[0].kind).toEqual('FLAG');
+
+    const flag = sequence.expressions[0] as Flag;
+    expect(flag.name.lexeme).toBe('flagName');
 });

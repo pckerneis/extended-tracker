@@ -82,26 +82,20 @@ export interface Call {
   readonly args: Expr[];
 }
 
-export interface Exit {
-  readonly kind: 'EXIT';
-  readonly token: Token;
+export interface Flag {
+  readonly kind: 'FLAG';
+  readonly flagToken: Token;
+  readonly name: Token;
 }
 
-export interface Enter {
-  readonly kind: 'ENTER';
-  readonly token: Token;
-}
-
-export interface Break {
-  readonly kind: 'BREAK';
-  readonly token: Token;
+export interface Jump {
+  readonly kind: 'JUMP';
+  readonly jumpToken: Token;
+  readonly name: Token;
 }
 
 export type Expr =
   Sequence
-  | Exit
-  | Enter
-  | Break
   | Binary
   | Call
   | RLUnary
@@ -113,4 +107,6 @@ export type Expr =
   | Logical
   | Param
   | ParamList
-  | ChannelList;
+  | ChannelList
+  | Flag
+  | Jump;

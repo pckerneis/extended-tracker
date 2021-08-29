@@ -113,6 +113,9 @@ export class Scanner {
         case ':':
           this.addToken(TokenType.COLON);
           break;
+        case '#':
+          this.addToken(TokenType.DASH);
+          break;
         case '|':
           this.addToken(this.match('|') ? TokenType.DOUBLE_PIPE : TokenType.PIPE);
           break;

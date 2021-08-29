@@ -13,11 +13,30 @@ export class Player {
     const steps = interpreter.interpret().steps;
     let position = 0;
 
+    console.log(steps);
+
     const handler = () => {
       const step = steps[position];
 
       if (step) {
-        step.forEach(message => {
+        if (step.flag != null) {
+          position++;
+          handler();
+          return;
+        }
+
+        if (step.jump != null) {
+          const jumpStep = steps.find(s => s.flag.name === step.jump.name);
+          const jumpPosition = steps.indexOf(jumpStep);
+
+          if (jumpPosition >= 0) {
+            position = jumpPosition + 1;
+            handler();
+            return;
+          }
+        }
+
+        step.messages.forEach(message => {
           let {p, v} = message;
 
           if (! isNaN(p)) {

@@ -32,6 +32,7 @@ export enum TokenType {
   AMPERSAND       = '&',
   DOLLAR          = '$',
   NEW_LINE        = 'NL',
+  DASH            = '#',
 }
 
 export const operators = '(){}[],.+-;/*%!=?<>|&$:"';
