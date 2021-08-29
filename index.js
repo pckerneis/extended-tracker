@@ -4,6 +4,7 @@ const commander = require('commander');
 const inquirer = require('inquirer');
 const fs = require('fs');
 const midi = require('midi');
+const chokidar = require('chokidar');
 const Player = require('./dist/player/Player').Player;
 const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
 
@@ -20,6 +21,7 @@ if (!outputPortCount) {
 
 let foundFile;
 let foundOutput;
+const codeSource = {};
 main();
 
 async function main() {
@@ -56,12 +58,11 @@ async function main() {
           });
       }
 
-      // chokidar
-      //   .watch(foundFile)
-      //   .on('change', (file) => {
-      //     codeSource.code = fs.readFileSync(file, 'utf8');
-      //     // player.parse();
-      //   });
+      chokidar
+        .watch(foundFile)
+        .on('change', () => {
+          codeSource.code = fs.readFileSync(foundFile, 'utf8');
+        });
 
       runProgram();
     });
@@ -70,9 +71,8 @@ async function main() {
 }
 
 function runProgram() {
-  const codeSource = { code: fs.readFileSync(foundFile, 'utf8') };
+  codeSource.code = fs.readFileSync(foundFile, 'utf8');
   Player.play(codeSource, new MidiOutput(output), onProgramEnded);
-
 }
 
 function printAvailableMidiOutputDevices() {

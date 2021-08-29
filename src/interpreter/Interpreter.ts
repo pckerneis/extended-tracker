@@ -29,34 +29,18 @@ export interface MessageSequence {
 }
 
 export class Interpreter {
-    private codeProvider: CodeProvider;
-    private expressions: Expr[];
-
-    public constructor(codeProvider: CodeProvider) {
-        this.codeProvider = codeProvider;
-    }
-
-    private getCode(): string {
-        return this.codeProvider.code;
-    }
-
-    public interpret(): MessageSequence {
+    public static interpret(code: string): MessageSequence {
         try {
-            const tokens = Scanner.scan(this.getCode());
-            this.expressions = Parser.parse(tokens);
-            return this.readProgram();
+            const tokens = Scanner.scan(code);
+            const expressions = Parser.parse(tokens);
+            return this.readProgram(expressions);
         } catch (e) {
             console.log('Parsing error ' + e);
         }
     }
 
-    private readProgram(): MessageSequence {
-        if (this.expressions == null) {
-            console.log('Not able to start because no expressions were parsed.')
-            return undefined;
-        }
-
-        const programDeclaration = this.findDeclaration('Program');
+    private static readProgram(expressions: Expr[]): MessageSequence {
+        const programDeclaration = this.findDeclaration('Program', expressions);
         const steps: Step[] = [];
 
         if (programDeclaration && programDeclaration.value.kind === 'SEQUENCE') {
@@ -97,8 +81,8 @@ export class Interpreter {
         return { steps };
     }
 
-    private findDeclaration(variableName: string): Assign {
-        return this.expressions.find(expr => expr.kind === 'ASSIGN'
+    private static findDeclaration(variableName: string, expressions: Expr[]): Assign {
+        return expressions.find(expr => expr.kind === 'ASSIGN'
           && expr.assignee.lexeme === variableName) as Assign;
     }
 }

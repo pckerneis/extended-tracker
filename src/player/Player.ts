@@ -9,8 +9,7 @@ export class Player {
   }
 
   private doPlay(codeSource: CodeProvider, output: MidiOutput, onEnded: Function): void {
-    const interpreter = new Interpreter(codeSource);
-    const steps = interpreter.interpret().steps;
+    let steps = Interpreter.interpret(codeSource.code).steps;
     let position = 0;
 
     console.log(steps);
@@ -26,24 +25,30 @@ export class Player {
         }
 
         if (step.jump != null) {
+          const messageSequence = Interpreter.interpret(codeSource.code);
+          steps = messageSequence.steps;
+
           const jumpStep = steps.find(s => s.flag.name === step.jump.name);
           const jumpPosition = steps.indexOf(jumpStep);
 
           if (jumpPosition >= 0) {
-            position = jumpPosition + 1;
+            position = jumpPosition;
             handler();
             return;
           }
+          handler();
         }
 
-        step.messages.forEach(message => {
-          let {p, v} = message;
+        if (step.messages != null) {
+          step.messages.forEach(message => {
+            let {p, v} = message;
 
-          if (! isNaN(p)) {
-            v = v || 127;
-            output.noteOn(p, v);
-          }
-        });
+            if (!isNaN(p)) {
+              v = v || 127;
+              output.noteOn(p, v);
+            }
+          });
+        }
       }
 
       position++;
