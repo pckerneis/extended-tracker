@@ -65,7 +65,7 @@ export class Parser {
           value,
         };
       } else {
-        throw new ParseError(equals, 'Invalid assignment target.');
+        throw new ParseError(equals, 'Invalid assignment target');
       }
     }
 
@@ -83,7 +83,7 @@ export class Parser {
 
     this.consumeNewLines();
 
-    this.consume([this.sequenceEndOperator], `Expect '${this.sequenceEndOperator}' after sequence.`);
+    this.consume([this.sequenceEndOperator], `Expect '${this.sequenceEndOperator}' after sequence`);
 
     return expressions;
   }
@@ -192,7 +192,7 @@ export class Parser {
           value,
         };
       } else {
-        throw new ParseError(colon, 'Invalid parameter name.');
+        throw new ParseError(colon, 'Invalid parameter name');
       }
     }
 
@@ -227,7 +227,7 @@ export class Parser {
       const condOp = this.previous();
       const ifBranch = this.expression();
 
-      this.consume([TokenType.COLON], 'Expected \':\' after if branch.');
+      this.consume([TokenType.COLON], 'Expected \':\' after if branch');
       const elseOp = this.previous();
       const elseBranch = this.expression();
 
@@ -330,7 +330,7 @@ export class Parser {
 
     if (this.match(TokenType.LEFT_PAREN)) {
       const expr: Expr = this.expression();
-      this.consume([TokenType.RIGHT_PAREN], 'Expect \')\' after expression.');
+      this.consume([TokenType.RIGHT_PAREN], 'Expect \')\' after expression');
       return {kind: Kind.GROUPING, expr};
     }
 
@@ -338,20 +338,8 @@ export class Parser {
       return {kind: Kind.VARIABLE, name: this.previous()};
     }
 
-    // if (this.match(this.exitToken)) {
-    //   return {kind: 'EXIT', token: this.previous()};
-    // }
-    //
-    // if (this.match(this.enterToken)) {
-    //   return {kind: 'ENTER', token: this.previous()};
-    // }
-    //
-    // if (this.match(this.breakToken)) {
-    //   return {kind: 'BREAK', token: this.previous()};
-    // }
-
     const peek = this.peek();
-    throw new ParseError(peek, 'Expect expression.');
+    throw new ParseError(peek, 'Expect expression');
   }
 
   private match(...types: TokenType[]): boolean {
@@ -393,27 +381,6 @@ export class Parser {
     throw new ParseError(this.peek(), message);
   }
 
-  // private finishCall(callee: Expr): Expr {
-  //   const startParenToken = this.previous();
-  //
-  //   const args: Expr[] = [];
-  //
-  //   if (! this.check(TokenType.RIGHT_PAREN)) {
-  //     do {
-  //       args.push(this.expression());
-  //     } while (this.match(TokenType.COMMA));
-  //   }
-  //
-  //   const endParenToken = this.consume([TokenType.RIGHT_PAREN], "Expect ')' after arguments.");
-  //
-  //   return {
-  //     kind: 'CALL',
-  //     callee,
-  //     parenTokens: [startParenToken, endParenToken],
-  //     args,
-  //   };
-  // }
-
   private consumeNewLines(): void {
     while (this.check(TokenType.NEW_LINE))
       this.advance();
@@ -422,7 +389,7 @@ export class Parser {
 
 class ParseError extends Error {
   constructor(public readonly token: Token,
-              public readonly message: string) {
-    super(message + ` at [${token.position.line}:${token.position.column}]`);
+              message: string) {
+    super(`${message} at [${token.position.line}:${token.position.column}]`);
   }
 }

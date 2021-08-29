@@ -1,15 +1,28 @@
 import {CodeProvider, Interpreter} from '../interpreter/Interpreter';
 import {MidiOutput} from '../midi/MidiOutput';
+import {ErrorReporter} from '../error/ErrorReporter';
 
 export class Player {
 
-  public static play(codeSource: CodeProvider, output: MidiOutput, onEnded: Function, onStepPlay: Function): void {
-    const player = new Player();
+  private constructor(private readonly errorReporter: ErrorReporter) {
+  }
+
+  public static play(codeSource: CodeProvider,
+                     output: MidiOutput,
+                     onEnded: Function,
+                     onStepPlay: Function,
+                     errorReporter?: ErrorReporter): void {
+    if (errorReporter == null) {
+      errorReporter = {
+        reportError: (...args: any[]) => console.error(args),
+      }
+    }
+    const player = new Player(errorReporter);
     player.doPlay(codeSource, output, onEnded, onStepPlay);
   }
 
   private doPlay(codeSource: CodeProvider, output: MidiOutput, onEnded: Function, onStepPlay: Function): void {
-    const result = Interpreter.interpret(codeSource.code);
+    const result = Interpreter.interpret(codeSource.code, this.errorReporter);
 
     if (result == null) {
       onEnded();
@@ -30,7 +43,7 @@ export class Player {
         }
 
         if (step.jump != null) {
-          const messageSequence = Interpreter.interpret(codeSource.code);
+          const messageSequence = Interpreter.interpret(codeSource.code, this.errorReporter);
 
           if (messageSequence != null) {
             steps = messageSequence.steps;
@@ -57,13 +70,13 @@ export class Player {
             }
           });
         }
-      }
 
-      onStepPlay({
-        sequenceName: 'Program',  // TODO
-        stepNumber: position,
-        messagesCount: step.messages?.length,
-      });
+        onStepPlay({
+          sequenceName: 'Program',  // TODO
+          stepNumber: position,
+          messagesCount: step.messages?.length,
+        });
+      }
 
       position++;
 

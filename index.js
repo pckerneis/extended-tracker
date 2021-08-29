@@ -37,6 +37,15 @@ function onStepPlayed(stepInfo) {
   process.stdout.write(string);
 }
 
+const errorReporter = {
+  reportError: (...args) => {
+    if (args.length > 0) {
+      console.log('');
+      console.error(...args);
+    }
+  }
+}
+
 let foundFile;
 let foundOutput;
 const codeSource = {};
@@ -90,7 +99,7 @@ async function main() {
 
 function runProgram() {
   codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.play(codeSource, new MidiOutput(output), onProgramEnded, onStepPlayed);
+  Player.play(codeSource, new MidiOutput(output), onProgramEnded, onStepPlayed, errorReporter);
 }
 
 function printAvailableMidiOutputDevices() {
@@ -101,6 +110,8 @@ function printAvailableMidiOutputDevices() {
 }
 
 async function onProgramEnded() {
+  console.log('');
+
   await inquirer.prompt([{type: 'confirm', name: 'confirm', message: 'Restart ?'}])
     .then(answers => {
       if (answers.confirm) {

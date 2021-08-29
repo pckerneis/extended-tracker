@@ -1,6 +1,7 @@
 import {Assign, Expr, Kind, Sequence} from '../parser/Ast';
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
+import {ErrorReporter} from '../error/ErrorReporter';
 
 export interface CodeProvider {
     code: string;
@@ -31,13 +32,13 @@ export interface MessageSequence {
 export class Interpreter {
     public static PROGRAM_VARIABLE: string = 'Program';
 
-    public static interpret(code: string): MessageSequence {
+    public static interpret(code: string, errorReporter: ErrorReporter): MessageSequence {
         try {
             const tokens = Scanner.scan(code);
             const expressions = Parser.parse(tokens);
             return this.readProgram(expressions);
         } catch (e) {
-            console.log('Parsing error ' + e);
+            errorReporter.reportError(e.message);
         }
     }
 
