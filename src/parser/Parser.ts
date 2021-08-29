@@ -1,5 +1,5 @@
 import {Token, TokenType} from '../scanner/tokens';
-import {Expr} from './Ast';
+import {Expr, Kind} from './Ast';
 
 export class Parser {
   private current: number = 0;
@@ -8,7 +8,7 @@ export class Parser {
   private readonly sequenceEndOperator = TokenType.RIGHT_BRACKET;
   private readonly sequenceSeparators = [TokenType.SEMICOLON, TokenType.NEW_LINE];
 
-  private readonly channelSeparator = TokenType.PIPE;
+  private readonly trackSeparator = TokenType.PIPE;
   private readonly paramSeparator = TokenType.COMMA;
 
   private readonly flagToken = TokenType.DASH;
@@ -24,7 +24,6 @@ export class Parser {
 
   private doParse(): Expr[] {
     if (this.tokens.length === 0) {
-      // reportError('Empty tokens array');
       return [];
     }
 
@@ -60,7 +59,7 @@ export class Parser {
         const name = expr.name;
 
         return {
-          kind: 'ASSIGN',
+          kind: Kind.ASSIGN,
           assignee: name,
           equals,
           value,
@@ -104,7 +103,7 @@ export class Parser {
 
         if (this.match(TokenType.IDENTIFIER)) {
           expressions.push({
-            kind: 'JUMP',
+            kind: Kind.JUMP,
             jumpToken,
             name: this.previous(),
           });
@@ -116,7 +115,7 @@ export class Parser {
 
         if (this.match(TokenType.IDENTIFIER)) {
           expressions.push({
-            kind: 'FLAG',
+            kind: Kind.FLAG,
             flagToken,
             name: this.previous(),
           });
@@ -124,11 +123,11 @@ export class Parser {
           throw new Error('Expected flag name after ' + this.flagToken);
         }
       } else {
-        const channelList = this.channelList();
+        const trackList = this.trackList();
 
         expressions.push({
-          kind: 'CHANNELS',
-          channels: channelList,
+          kind: Kind.TRACKS,
+          tracks: trackList,
         });
       }
     } while (this.match(...this.sequenceSeparators));
@@ -138,8 +137,8 @@ export class Parser {
     return expressions;
   }
 
-  private channelList(): Expr[] {
-      const channels: Expr[] = [];
+  private trackList(): Expr[] {
+      const tracks: Expr[] = [];
 
       do {
         if (this.check(TokenType.NEW_LINE)) {
@@ -148,15 +147,15 @@ export class Parser {
 
         const params = this.paramList();
         if (params != null) {
-          channels.push({
-            kind: 'PARAMS',
+          tracks.push({
+            kind: Kind.PARAMS,
             params,
 
           });
         }
-      } while (this.match(this.channelSeparator));
+      } while (this.match(this.trackSeparator));
 
-      return channels;
+      return tracks;
   }
 
   private paramList(): Expr[] {
@@ -187,7 +186,7 @@ export class Parser {
         const name = expr.name;
 
         return {
-          kind: 'PARAM',
+          kind: Kind.PARAM,
           assignee: name,
           colon,
           value,
@@ -212,7 +211,7 @@ export class Parser {
       this.consumeNewLines();
 
       return {
-        kind: 'SEQUENCE',
+        kind: Kind.SEQUENCE,
         expressions: sequence,
         startToken, endToken,
       }
@@ -233,7 +232,7 @@ export class Parser {
       const elseBranch = this.expression();
 
       return {
-        kind: 'TERNARY_COND',
+        kind: Kind.TERNARY_COND,
         condition: expr,
         ifBranch, elseBranch,
         operators: [condOp, elseOp],
@@ -249,7 +248,7 @@ export class Parser {
     while (this.match(TokenType.DOUBLE_PIPE)) {
       const operator: Token = this.previous();
       const right: Expr = this.and();
-      expr = {kind: 'LOGICAL', left: expr, operator, right};
+      expr = {kind: Kind.LOGICAL, left: expr, operator, right};
     }
 
     return expr;
@@ -261,7 +260,7 @@ export class Parser {
     while (this.match(TokenType.AMPERSAND)) {
       const operator: Token = this.previous();
       const right: Expr = this.equality();
-      expr = {kind: 'LOGICAL', left: expr, operator, right};
+      expr = {kind: Kind.LOGICAL, left: expr, operator, right};
     }
 
     return expr;
@@ -273,7 +272,7 @@ export class Parser {
     while (this.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
       const operator: Token = this.previous();
       const right: Expr = this.comparison();
-      expr = {kind: 'BINARY', left: expr, operator, right};
+      expr = {kind: Kind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -285,7 +284,7 @@ export class Parser {
     while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
       const operator: Token = this.previous();
       const right: Expr = this.addition();
-      expr = {kind: 'BINARY', left: expr, operator, right};
+      expr = {kind: Kind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -297,7 +296,7 @@ export class Parser {
     while (this.match(TokenType.MINUS, TokenType.PLUS)) {
       const operator: Token = this.previous();
       const right: Expr = this.multiplication();
-      left = {kind: 'BINARY', left, operator, right};
+      left = {kind: Kind.BINARY, left, operator, right};
     }
 
     return left;
@@ -309,7 +308,7 @@ export class Parser {
     while (this.match(TokenType.SLASH, TokenType.STAR)) {
       const operator: Token = this.previous();
       const right: Expr = this.unary();
-      expr = {kind: 'BINARY', left: expr, operator, right};
+      expr = {kind: Kind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -319,35 +318,24 @@ export class Parser {
     if (this.match(TokenType.BANG, TokenType.MINUS)) {
       const operator: Token = this.previous();
       const right: Expr = this.unary();
-      return {kind: 'RL_UNARY', operator, right};
+      return {kind: Kind.RL_UNARY, operator, right};
     }
 
-    // return this.call();
     return this.primary();
   }
 
-  // private call(): Expr {
-  //   let expr = this.primary();
-  //
-  //   while(this.match(TokenType.LEFT_PAREN)) {
-  //     expr = this.finishCall(expr);
-  //   }
-  //
-  //   return expr;
-  // }
-
   private primary(): Expr {
     if (this.match(TokenType.NUMBER, TokenType.STRING))
-      return {kind: 'LITERAL', value: this.previous().literal, token: this.previous()};
+      return {kind: Kind.LITERAL, value: this.previous().literal, token: this.previous()};
 
     if (this.match(TokenType.LEFT_PAREN)) {
       const expr: Expr = this.expression();
       this.consume([TokenType.RIGHT_PAREN], 'Expect \')\' after expression.');
-      return {kind: 'GROUPING', expr};
+      return {kind: Kind.GROUPING, expr};
     }
 
     if (this.match(TokenType.IDENTIFIER)) {
-      return {kind: 'VARIABLE', name: this.previous()};
+      return {kind: Kind.VARIABLE, name: this.previous()};
     }
 
     // if (this.match(this.exitToken)) {

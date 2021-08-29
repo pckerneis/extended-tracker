@@ -1,74 +1,92 @@
-import { Token } from "../scanner/tokens";
+import {Token} from '../scanner/tokens';
+
+export enum Kind {
+  SEQUENCE = 'SEQUENCE',
+  TRACKS = 'TRACKS',
+  VARIABLE = 'VARIABLE',
+  ASSIGN = 'ASSIGN',
+  PARAM = 'PARAM',
+  PARAMS = 'PARAMS',
+  LOGICAL = 'LOGICAL',
+  RL_UNARY = 'RL_UNARY',
+  BINARY = 'BINARY',
+  LITERAL = 'LITERAL',
+  GROUPING = 'GROUPING',
+  TERNARY_COND = 'TERNARY_COND',
+  CALL = 'CALL',
+  FLAG = 'FLAG',
+  JUMP = 'JUMP',
+}
 
 export interface Sequence {
-  readonly kind: 'SEQUENCE';
+  readonly kind: Kind.SEQUENCE;
   readonly expressions: (Expr | null)[];
   readonly startToken: Token;
   readonly endToken: Token;
 }
 
-export interface ChannelList {
-  readonly kind: 'CHANNELS';
-  readonly channels: Expr[];
+export interface TrackList {
+  readonly kind: Kind.TRACKS;
+  readonly tracks: Expr[];
 }
 
 export interface Variable {
-  readonly kind: 'VARIABLE';
+  readonly kind: Kind.VARIABLE;
   readonly name: Token;
 }
 
 export interface Assign {
-  readonly kind: 'ASSIGN';
+  readonly kind: Kind.ASSIGN;
   readonly value: Expr;
   readonly assignee: Token;
   readonly equals: Token;
 }
 
 export interface Param {
-  readonly kind: 'PARAM';
+  readonly kind: Kind.PARAM;
   readonly value: Expr;
   readonly assignee: Token;
   readonly colon: Token;
 }
 
 export interface ParamList {
-  readonly kind: 'PARAMS';
+  readonly kind: Kind.PARAMS;
   readonly params: Expr[];
 }
 
 export interface Logical {
-  readonly kind: 'LOGICAL';
+  readonly kind: Kind.LOGICAL;
   readonly left: Expr;
   readonly right: Expr;
   readonly operator: Token;
 }
 
 export interface RLUnary {
-  readonly kind: 'RL_UNARY';
+  readonly kind: Kind.RL_UNARY;
   readonly right: Expr;
   readonly operator: Token;
 }
 
 export interface Binary {
-  readonly kind: 'BINARY';
+  readonly kind: Kind.BINARY;
   readonly left: Expr;
   readonly operator: Token;
   readonly right: Expr;
 }
 
 export interface Literal {
-  readonly kind: 'LITERAL';
+  readonly kind: Kind.LITERAL;
   readonly value: any;
   readonly token: Token;
 }
 
 export interface Grouping {
-  readonly kind: 'GROUPING';
+  readonly kind: Kind.GROUPING;
   readonly expr: Expr;
 }
 
 export interface TernaryCondition {
-  readonly kind: 'TERNARY_COND';
+  readonly kind: Kind.TERNARY_COND;
   readonly condition: Expr;
   readonly ifBranch: Expr;
   readonly elseBranch: Expr;
@@ -76,20 +94,20 @@ export interface TernaryCondition {
 }
 
 export interface Call {
-  readonly kind: 'CALL';
+  readonly kind: Kind.CALL;
   readonly callee: Expr;
   readonly parenTokens: Token[];
   readonly args: Expr[];
 }
 
 export interface Flag {
-  readonly kind: 'FLAG';
+  readonly kind: Kind.FLAG;
   readonly flagToken: Token;
   readonly name: Token;
 }
 
 export interface Jump {
-  readonly kind: 'JUMP';
+  readonly kind: Kind.JUMP;
   readonly jumpToken: Token;
   readonly name: Token;
 }
@@ -107,6 +125,6 @@ export type Expr =
   | Logical
   | Param
   | ParamList
-  | ChannelList
+  | TrackList
   | Flag
   | Jump;

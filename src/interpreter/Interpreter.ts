@@ -1,4 +1,4 @@
-import {Assign, Expr, Sequence} from '../parser/Ast';
+import {Assign, Expr, Kind, Sequence} from '../parser/Ast';
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
 
@@ -29,6 +29,8 @@ export interface MessageSequence {
 }
 
 export class Interpreter {
+    public static PROGRAM_VARIABLE: string = 'Program';
+
     public static interpret(code: string): MessageSequence {
         try {
             const tokens = Scanner.scan(code);
@@ -40,32 +42,32 @@ export class Interpreter {
     }
 
     private static readProgram(expressions: Expr[]): MessageSequence {
-        const programDeclaration = this.findDeclaration('Program', expressions);
+        const programDeclaration = this.findDeclaration(this.PROGRAM_VARIABLE, expressions);
         const steps: Step[] = [];
 
-        if (programDeclaration && programDeclaration.value.kind === 'SEQUENCE') {
+        if (programDeclaration && programDeclaration.value.kind === Kind.SEQUENCE) {
             const programSequence = programDeclaration.value as Sequence;
 
             programSequence.expressions.forEach(channelsOrFlagOrJump => {
 
-                if (channelsOrFlagOrJump.kind === 'FLAG') {
+                if (channelsOrFlagOrJump.kind === Kind.FLAG) {
                     const flag = ({name: channelsOrFlagOrJump.name.lexeme});
                     steps.push({flag});
-                } else if (channelsOrFlagOrJump.kind === 'JUMP') {
+                } else if (channelsOrFlagOrJump.kind === Kind.JUMP) {
                     const jump = {name: channelsOrFlagOrJump.name.lexeme};
                     steps.push({jump});
-                } else if (channelsOrFlagOrJump.kind === 'CHANNELS') {
+                } else if (channelsOrFlagOrJump.kind === Kind.TRACKS) {
                     const messages: Message[] = [];
 
-                    channelsOrFlagOrJump.channels.forEach((params, channelIndex) => {
+                    channelsOrFlagOrJump.tracks.forEach((params, channelIndex) => {
                         const paramMap = {
                             i: channelIndex,
                         };
 
-                        if (params.kind === 'PARAMS') {
+                        if (params.kind === Kind.PARAMS) {
                             params.params.forEach(param => {
-                                if (param.kind === 'PARAM') {
-                                    paramMap[param.assignee.lexeme] = param.value.kind === 'LITERAL' ? param.value.value : null;
+                                if (param.kind === Kind.PARAM) {
+                                    paramMap[param.assignee.lexeme] = param.value.kind === Kind.LITERAL ? param.value.value : null;
                                 }
                             });
                         }
