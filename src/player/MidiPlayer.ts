@@ -2,9 +2,53 @@ import {CodeProvider, Interpreter} from '../interpreter/Interpreter';
 import {MidiOutput} from '../midi/MidiOutput';
 import {ErrorReporter} from '../error/ErrorReporter';
 
-export class Player {
+class Track {
+  private latestVelocity = 0;
+  private _latestPitch: number;
 
-  private constructor(private readonly errorReporter: ErrorReporter) {
+  constructor(public readonly output: MidiOutput) {
+
+  }
+
+  noteOn(pitch: number, velocity?: number) {
+    this.endPendingNote();
+
+    if (velocity != null) {
+      velocity = Math.min(Math.max(0, velocity), 127);
+      this.latestVelocity = velocity;
+    } else {
+      velocity = this.latestVelocity;
+    }
+
+    this.output.noteOn(pitch, velocity);
+    this._latestPitch = pitch;
+  }
+
+  silence() {
+    this.endPendingNote();
+  }
+
+  velocityChange(velocity: number) {
+    if (! isNaN(velocity)) {
+      velocity = Math.min(Math.max(0, velocity), 127);
+      this.latestVelocity = velocity;
+    }
+  }
+
+  private endPendingNote(): void {
+    if (this._latestPitch != null) {
+      this.output.noteOff(this._latestPitch);
+      this._latestPitch = null;
+    }
+  }
+}
+
+export class MidiPlayer {
+
+  private tracks: Map<number, Track> = new Map();
+
+  private constructor(private readonly output: MidiOutput,
+                      private readonly errorReporter: ErrorReporter) {
   }
 
   public static play(codeSource: CodeProvider,
@@ -17,11 +61,11 @@ export class Player {
         reportError: (...args: any[]) => console.error(args),
       }
     }
-    const player = new Player(errorReporter);
-    player.doPlay(codeSource, output, onEnded, onStepPlay);
+    const player = new MidiPlayer(output, errorReporter);
+    player.doPlay(codeSource, onEnded, onStepPlay);
   }
 
-  private doPlay(codeSource: CodeProvider, output: MidiOutput, onEnded: Function, onStepPlay: Function): void {
+  private doPlay(codeSource: CodeProvider, onEnded: Function, onStepPlay: Function): void {
     const result = Interpreter.interpret(codeSource.code, this.errorReporter);
 
     if (result == null) {
@@ -60,13 +104,25 @@ export class Player {
           handler();
         }
 
+        let noteOnCounter = 0;
+
         if (step.messages != null) {
           step.messages.forEach(message => {
-            let {p, v} = message;
+            let {p, v, i} = message.params;
+            let track = this.tracks.get(i);
 
-            if (!isNaN(p) && p >= 0 && p < 128) {
-              v = Math.min(Math.max(0, v), 127);
-              output.noteOn(p, v);
+            if (track == null) {
+              this.tracks.set(i, new Track(this.output));
+              track = this.tracks.get(i);
+            }
+
+            if (message.silent) {
+              track.silence();
+            } else if (!isNaN(p) && p >= 0 && p < 128) {
+              track.noteOn(p, v);
+              noteOnCounter++;
+            } else if (v != null) {
+              track.velocityChange(v);
             }
           });
         }
@@ -74,7 +130,7 @@ export class Player {
         onStepPlay({
           sequenceName: 'Program',  // TODO
           stepNumber: position,
-          messagesCount: step.messages?.length,
+          noteOnCount: noteOnCounter,
         });
       }
 

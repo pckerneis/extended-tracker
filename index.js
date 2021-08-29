@@ -5,7 +5,7 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const midi = require('midi');
 const chokidar = require('chokidar');
-const Player = require('./dist/player/Player').Player;
+const Player = require('./dist/player/MidiPlayer').MidiPlayer;
 const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
@@ -24,8 +24,8 @@ let wroteOnce = false;
 function onStepPlayed(stepInfo) {
   const sequenceName = stepInfo.sequenceName;
   const stepNumber = stepInfo.stepNumber;
-  const messageBar = new Array(stepInfo.messagesCount).fill('#').join('');
-  const string = `${sequenceName}[${stepNumber}] ${messageBar} `;
+  const messageBar = new Array(stepInfo.noteOnCount).fill('#').join('');
+  const string = `${sequenceName}[${stepNumber}] ${messageBar} `.padEnd(sequenceName.length + 3 + 16);
 
   if (! wroteOnce) {
     wroteOnce = true;

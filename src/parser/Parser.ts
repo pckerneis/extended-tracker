@@ -14,6 +14,8 @@ export class Parser {
   private readonly flagToken = TokenType.DASH;
   private readonly jumpToken = TokenType.DOLLAR;
 
+  private readonly silenceToken = TokenType.MINUS;
+
   constructor(public readonly tokens: Token[]) {
   }
 
@@ -145,14 +147,23 @@ export class Parser {
           break;
         }
 
-        const params = this.paramList();
-        if (params != null) {
-          tracks.push({
-            kind: Kind.PARAMS,
-            params,
+        const params: Expr[] = [];
 
+        if (this.match(this.silenceToken)) {
+          params.push({
+            kind: Kind.SILENCE,
+            token: this.previous()
           });
+
+          this.match(this.paramSeparator);
         }
+
+        params.push(...this.paramList());
+
+        tracks.push({
+          kind: Kind.PARAMS,
+          params,
+        });
       } while (this.match(this.trackSeparator));
 
       return tracks;

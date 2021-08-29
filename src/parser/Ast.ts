@@ -16,6 +16,7 @@ export enum Kind {
   CALL = 'CALL',
   FLAG = 'FLAG',
   JUMP = 'JUMP',
+  SILENCE = 'SILENCE',
 }
 
 export interface Sequence {
@@ -40,6 +41,11 @@ export interface Assign {
   readonly value: Expr;
   readonly assignee: Token;
   readonly equals: Token;
+}
+
+export interface Silence {
+  readonly kind: Kind.SILENCE;
+  readonly token: Token;
 }
 
 export interface Param {
@@ -124,6 +130,7 @@ export type Expr =
   | TernaryCondition
   | Logical
   | Param
+  | Silence
   | ParamList
   | TrackList
   | Flag
