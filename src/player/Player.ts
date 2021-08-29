@@ -52,7 +52,7 @@ export class Player {
             let {p, v} = message;
 
             if (!isNaN(p)) {
-              v = v || 127;
+              v = Math.min(Math.max(0, v), 127);
               output.noteOn(p, v);
             }
           });
