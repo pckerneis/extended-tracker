@@ -104,6 +104,9 @@ export class Scanner {
         case '$':
           this.addToken(TokenType.DOLLAR);
           break;
+        case '@':
+          this.addToken(TokenType.AT);
+          break;
         case '&':
           this.addToken(TokenType.AMPERSAND);
           break;

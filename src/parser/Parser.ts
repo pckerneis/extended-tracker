@@ -12,7 +12,7 @@ export class Parser {
   private readonly paramSeparator = TokenType.COMMA;
 
   private readonly flagToken = TokenType.DASH;
-  private readonly jumpToken = TokenType.DOLLAR;
+  private readonly jumpToken = TokenType.AT;
 
   private readonly silenceToken = TokenType.MINUS;
 

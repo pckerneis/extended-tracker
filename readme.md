@@ -198,7 +198,7 @@ One can define flags which are temporal markers and jump to a flag defined withi
 
 Flags are lines in a sequence that begin with "#" character followed by a name.
 
-Jumps begin with the "$" operator followed by a flag name.
+Jumps begin with the "@" operator followed by a flag name.
 
 ```
 loop = [
@@ -206,7 +206,7 @@ loop = [
 p: 0
 p: 2
 p: 4
-$ begin
+@ begin
 ]
 ```
 
@@ -216,11 +216,11 @@ $ begin
 finished = false
 
 loop = [
-$ begin
+# begin
 p: 0
 p: 2
 p: 4
-finished ? {} : {-> begin}
+finished ? {} : {@ begin}
 ]
 ```
 
@@ -248,8 +248,8 @@ Step => ChanelList | ConditionalBranch | Flag | Jump
 ChanelList => ParamList ("|" ParamList)*
 ConditionalBranch => Evaluable "?" Branch ":" (ConditionalBranch | Branch)
 Branch => "{" (StepList | VARIABLE_NAME) "}"
-Flag => "$" FLAG_NAME
-Jump => "->" FLAG_NAME
+Flag => "#" FLAG_NAME
+Jump => "@" FLAG_NAME
 
 Message = "{" ParamList "}"
 
