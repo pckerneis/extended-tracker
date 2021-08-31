@@ -1,4 +1,4 @@
-import {Assign, Flag, Sequence} from '../../src/parser/Ast';
+import {Assign, Flag, InnerSequence, Sequence} from '../../src/parser/Ast';
 import {Parser} from '../../src/parser/Parser';
 import {Scanner} from '../../src/scanner/Scanner';
 
@@ -78,7 +78,7 @@ test('should parse a sequence declaration', () => {
     const sequence = assign.value as Sequence;
     expect(sequence.expressions.length).toBe(3);
 
-    sequence.expressions.forEach(expr => expect(expr.kind).toEqual('CHANNELS'));
+    sequence.expressions.forEach(expr => expect(expr.kind).toEqual('TRACKS'));
   });
 
 });
@@ -105,4 +105,29 @@ test('should parse flags', () => {
 
     const flag = sequence.expressions[0] as Flag;
     expect(flag.name.lexeme).toBe('flagName');
+});
+
+
+test('should parse inner sequences', () => {
+  const testCode = `Program = [
+        {inner}
+        ]`;
+
+  const tokens = Scanner.scan(testCode);
+  const exprs = Parser.parse(tokens);
+
+  expect(exprs.length).toEqual(1);
+  expect(exprs[0].kind).toEqual('ASSIGN');
+
+  const assign = exprs[0] as Assign;
+
+  expect(assign.value.kind).toEqual('SEQUENCE');
+
+  const sequence = assign.value as Sequence;
+  expect(sequence.expressions.length).toBe(1);
+  expect(sequence.expressions[0].kind).toEqual('INNER_SEQUENCE');
+
+  const flag = sequence.expressions[0] as InnerSequence;
+  expect(flag.name.lexeme).toBe('inner');
+
 });

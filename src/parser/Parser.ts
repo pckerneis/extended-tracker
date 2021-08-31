@@ -4,9 +4,13 @@ import {Expr, Kind} from './Ast';
 export class Parser {
   private current: number = 0;
 
-  private readonly sequenceStartOperator = TokenType.LEFT_BRACKET;
-  private readonly sequenceEndOperator = TokenType.RIGHT_BRACKET;
-  private readonly sequenceSeparators = [TokenType.SEMICOLON, TokenType.NEW_LINE];
+  private readonly sequenceStartToken = TokenType.LEFT_BRACKET;
+  private readonly sequenceEndToken = TokenType.RIGHT_BRACKET;
+
+  private readonly innerSequenceStartToken = TokenType.LEFT_BRACE;
+  private readonly innerSequenceEndToken = TokenType.RIGHT_BRACE;
+
+  private readonly stepSeparators = [TokenType.SEMICOLON, TokenType.NEW_LINE];
 
   private readonly trackSeparator = TokenType.PIPE;
   private readonly paramSeparator = TokenType.COMMA;
@@ -79,13 +83,11 @@ export class Parser {
 
     let expressions: Expr[] = [];
 
-    if (!this.check(this.sequenceEndOperator)) {
+    if (!this.match(this.sequenceEndToken)) {
       expressions = this.parseSequenceSteps();
+      this.consumeNewLines();
+      this.consume([this.sequenceEndToken], `Expect '${this.sequenceEndToken}' after sequence`);
     }
-
-    this.consumeNewLines();
-
-    this.consume([this.sequenceEndOperator], `Expect '${this.sequenceEndOperator}' after sequence`);
 
     return expressions;
   }
@@ -96,7 +98,7 @@ export class Parser {
     do {
       this.consumeNewLines();
 
-      if (this.check(this.sequenceEndOperator)) {
+      if (this.check(this.sequenceEndToken)) {
         break;
       }
 
@@ -124,6 +126,10 @@ export class Parser {
         } else {
           throw new Error('Expected flag name after ' + this.flagToken);
         }
+      } else if (this.match(this.innerSequenceStartToken)) {
+        if (!this.check(this.innerSequenceEndToken)) {
+          expressions.push(this.innerSequence());
+        }
       } else {
         const trackList = this.trackList();
 
@@ -132,7 +138,7 @@ export class Parser {
           tracks: trackList,
         });
       }
-    } while (this.match(...this.sequenceSeparators));
+    } while (this.match(...this.stepSeparators));
 
     this.consumeNewLines();
 
@@ -140,33 +146,24 @@ export class Parser {
   }
 
   private trackList(): Expr[] {
-      const tracks: Expr[] = [];
+    const tracks: Expr[] = [];
 
-      do {
-        if (this.check(TokenType.NEW_LINE)) {
-          break;
-        }
+    do {
+      if (this.check(TokenType.NEW_LINE)) {
+        break;
+      }
 
-        const params: Expr[] = [];
+      const params: Expr[] = [];
 
-        if (this.match(this.silenceToken)) {
-          params.push({
-            kind: Kind.SILENCE,
-            token: this.previous()
-          });
+      params.push(...this.paramList());
 
-          this.match(this.paramSeparator);
-        }
+      tracks.push({
+        kind: Kind.PARAMS,
+        params,
+      });
+    } while (this.match(this.trackSeparator));
 
-        params.push(...this.paramList());
-
-        tracks.push({
-          kind: Kind.PARAMS,
-          params,
-        });
-      } while (this.match(this.trackSeparator));
-
-      return tracks;
+    return tracks;
   }
 
   private paramList(): Expr[] {
@@ -189,12 +186,12 @@ export class Parser {
   private param(): Expr {
     const expr = this.primary();
 
-    if (this.match(TokenType.COLON)) {
-      const colon = this.previous();
+    if (expr.kind === 'VARIABLE') {
+      const name = expr.name;
 
-      if (expr.kind === 'VARIABLE') {
+      if (this.match(TokenType.COLON)) {
+        const colon = this.previous();
         const value = this.expression();
-        const name = expr.name;
 
         return {
           kind: Kind.PARAM,
@@ -202,18 +199,41 @@ export class Parser {
           colon,
           value,
         };
-      } else {
-        throw new ParseError(colon, 'Invalid parameter name');
+      } else if ([this.paramSeparator, this.trackSeparator, ...this.stepSeparators].includes(this.peek().type)) {
+        return {
+          kind: Kind.PARAM,
+          assignee: name,
+          colon: null,
+          value: null,
+        };
       }
     }
 
-    return expr;
+    throw new ParseError(this.previous(), 'Invalid parameter name');
+  }
+
+  private innerSequence(): Expr {
+    const startToken = this.previous();
+    const expr = this.primary();
+
+    if (expr.kind !== Kind.VARIABLE) {
+      throw new ParseError(this.previous(), 'Expect a inner sequence name.');
+    }
+
+    this.consume([this.innerSequenceEndToken], `Expect ${TokenType.RIGHT_BRACKET} after a inner sequence`);
+    const endToken = this.previous();
+
+    return {
+      kind: Kind.INNER_SEQUENCE,
+      name: expr.name,
+      startToken, endToken,
+    };
   }
 
   private expression(): Expr {
     this.consumeNewLines();
 
-    if (this.match(this.sequenceStartOperator)) {
+    if (this.match(this.sequenceStartToken)) {
       const startToken = this.previous();
       this.consumeNewLines();
       const sequence = this.sequence();
@@ -345,7 +365,7 @@ export class Parser {
       return {kind: Kind.GROUPING, expr};
     }
 
-    if (this.match(TokenType.IDENTIFIER)) {
+    if (this.match(TokenType.IDENTIFIER, this.silenceToken)) {
       return {kind: Kind.VARIABLE, name: this.previous()};
     }
 
@@ -401,6 +421,6 @@ export class Parser {
 class ParseError extends Error {
   constructor(public readonly token: Token,
               message: string) {
-    super(`${message} at [${token.position.line}:${token.position.column}]`);
+    super(`${message} at [${token.position.line + 1}:${token.position.column}]`);
   }
 }

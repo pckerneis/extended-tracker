@@ -1,9 +1,27 @@
+seqB = [
+p: 65, v: 20
+p: 64, v: 20
+]
+
+seqC = [p: 75, v: 20 | p: 72, v: 40]
+
+seqA = [
+{seqC}
+{seqB}
+]
+
+
 Program = [
 # start
+{seqA}
+- | -
+- | -
 p: 69, v: 20 | p: 72, v: 40
 p: 65, v: 20
 p: 61, v: 20 | p: 70, v: 20
 - | -
+- | -
+{seqA}
 p: 69, v: 20
 v: 10
 @ start

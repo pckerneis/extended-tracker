@@ -2,6 +2,7 @@ import {Token} from '../scanner/tokens';
 
 export enum Kind {
   SEQUENCE = 'SEQUENCE',
+  INNER_SEQUENCE = 'INNER_SEQUENCE',
   TRACKS = 'TRACKS',
   VARIABLE = 'VARIABLE',
   ASSIGN = 'ASSIGN',
@@ -22,6 +23,13 @@ export enum Kind {
 export interface Sequence {
   readonly kind: Kind.SEQUENCE;
   readonly expressions: (Expr | null)[];
+  readonly startToken: Token;
+  readonly endToken: Token;
+}
+
+export interface InnerSequence {
+  readonly kind: Kind.INNER_SEQUENCE;
+  readonly name: Token;
   readonly startToken: Token;
   readonly endToken: Token;
 }
@@ -120,6 +128,7 @@ export interface Jump {
 
 export type Expr =
   Sequence
+  | InnerSequence
   | Binary
   | Call
   | RLUnary
