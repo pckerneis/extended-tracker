@@ -202,11 +202,28 @@ Jumps begin with the "@" operator followed by a flag name.
 
 ```
 loop = [
-# begin
+# begin of loop
 p: 0
 p: 2
 p: 4
-@ begin
+@ begin of loop
+]
+```
+
+### Outer jumps
+
+It's possible to jump from a sequence to another by specifying a sequence name followed by '#'. You can then
+specify a flag to jump to within the target sequence. 
+
+```
+Sequence 1 = [
+p:1
+# flag A
+p:2
+]
+
+Program = [
+@ Sequence 1 # flag A
 ]
 ```
 
@@ -227,10 +244,13 @@ finished ? {} : {@ begin}
 ## Control messages
 
 Control messages are special instructions that can appear either at the top level
-or in a sequence. They allow sending messages to parts of the execution engine such as the player.
+or in a sequence. They allow sending messages to parts of the execution engine such
+as the player to control speed or other parameters.
+
+Control messages don't increment the time counter : the next step will play immediately after.
 
 ```
-@Player tempo: 120, step: 0.25
+$ Player tempo: 120, step: 0.25
 ```
 
 # Program syntax
