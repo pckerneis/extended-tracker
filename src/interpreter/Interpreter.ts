@@ -17,7 +17,8 @@ export interface FlagMessage {
 }
 
 export interface JumpMessage {
-  name: string;
+  sequence?: string;
+  flag?: string;
 }
 
 export interface Step {
@@ -109,7 +110,7 @@ export class Interpreter {
   }
 
   private static processJumpStep(jumpExpr: Jump): Step {
-    const jump = {name: jumpExpr.name.lexeme};
+    const jump = {sequence: jumpExpr.sequence?.lexeme, flag: jumpExpr.flag?.lexeme};
     return {jump};
   }
 

@@ -106,11 +106,39 @@ export class Parser {
         const jumpToken = this.previous();
 
         if (this.match(TokenType.IDENTIFIER)) {
-          expressions.push({
-            kind: Kind.JUMP,
-            jumpToken,
-            name: this.previous(),
-          });
+          const sequenceOrFlagName = this.previous()
+
+          if (this.match(this.flagToken)) {
+            const flagToken = this.previous();
+
+            if (this.match(TokenType.IDENTIFIER)) {
+              const outerFlagName = this.previous();
+
+              expressions.push({
+                kind: Kind.JUMP,
+                jumpToken,
+                sequence: sequenceOrFlagName,
+                flag: outerFlagName,
+                flagToken,
+              });
+            } else {
+              expressions.push({
+                kind: Kind.JUMP,
+                jumpToken,
+                sequence: sequenceOrFlagName,
+                flag: null,
+                flagToken,
+              });
+            }
+          } else {
+            expressions.push({
+              kind: Kind.JUMP,
+              jumpToken,
+              sequence: null,
+              flag: sequenceOrFlagName,
+              flagToken: null,
+            });
+          }
         } else {
           throw new Error('Expected flag name after ' + this.jumpToken);
         }

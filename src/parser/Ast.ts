@@ -123,7 +123,9 @@ export interface Flag {
 export interface Jump {
   readonly kind: Kind.JUMP;
   readonly jumpToken: Token;
-  readonly name: Token;
+  readonly flag: Token;
+  readonly sequence: Token;
+  readonly flagToken: Token;
 }
 
 export type Expr =

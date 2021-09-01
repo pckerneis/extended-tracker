@@ -130,11 +130,23 @@ export class MidiPlayer {
   private jump(step: Step, stepArguments: StepArguments): void {
     this.reinterpretCode();
 
-    const flagStep = this.currentSteps.find(s => s.flag?.name === step.jump.name);
-    const jumpPosition = this.currentSteps.indexOf(flagStep);
+    if (step.jump.sequence) {
+      if (this.stepsBySequenceName[step.jump.sequence] != null) {
+        this.currentSequenceName = step.jump.sequence;
+        this.currentSteps = this.currentSequence;
+        this.stepPositionInSequence = 0;
+      } else {
+        this.advance(stepArguments);
+      }
+    }
 
-    if (jumpPosition >= 0) {
-      this.stepPositionInSequence = jumpPosition;
+    if (step.jump.flag) {
+      const flagStep = this.currentSteps.find(s => s.flag?.name === step.jump.flag);
+      const jumpPosition = this.currentSteps.indexOf(flagStep);
+
+      if (jumpPosition >= 0) {
+        this.stepPositionInSequence = jumpPosition;
+      }
     }
 
     this.nextStep(stepArguments);

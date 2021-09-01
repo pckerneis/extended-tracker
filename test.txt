@@ -13,7 +13,6 @@ seqA = [
 
 Program = [
 # start
-{seqA}
 - | -
 - | -
 p: 69, v: 20 | p: 72, v: 40

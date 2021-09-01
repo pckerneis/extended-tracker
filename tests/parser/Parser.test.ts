@@ -1,4 +1,4 @@
-import {Assign, Flag, InnerSequence, Sequence} from '../../src/parser/Ast';
+import {Assign, Flag, InnerSequence, Jump, Sequence} from '../../src/parser/Ast';
 import {Parser} from '../../src/parser/Parser';
 import {Scanner} from '../../src/scanner/Scanner';
 
@@ -105,6 +105,35 @@ test('should parse flags', () => {
 
     const flag = sequence.expressions[0] as Flag;
     expect(flag.name.lexeme).toBe('flagName');
+});
+
+test('should parse outer jump', () => {
+  const testCode = `Program = [
+        @ seq #
+        @ seq2 # flag
+        ]`;
+
+    const tokens = Scanner.scan(testCode);
+    const exprs = Parser.parse(tokens);
+
+    expect(exprs.length).toEqual(1);
+    expect(exprs[0].kind).toEqual('ASSIGN');
+
+    const assign = exprs[0] as Assign;
+
+    expect(assign.value.kind).toEqual('SEQUENCE');
+
+    const sequence = assign.value as Sequence;
+    expect(sequence.expressions.length).toBe(2);
+
+    expect(sequence.expressions[0].kind).toEqual('JUMP');
+    const jump = sequence.expressions[0] as Jump;
+    expect(jump.sequence.lexeme).toBe('seq');
+
+    expect(sequence.expressions[1].kind).toEqual('JUMP');
+    const secondJump = sequence.expressions[1] as Jump;
+    expect(secondJump.sequence.lexeme).toBe('seq2');
+    expect(secondJump.flag.lexeme).toBe('flag');
 });
 
 
