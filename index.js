@@ -11,9 +11,8 @@ const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
 
 const output = new midi.Output();
-const outputPortCount = output.getPortCount();
 
-if (!outputPortCount) {
+if (!output.getPortCount()) {
   const error = (txt) => chalk.red(txt);
   console.log(error('No MIDI output device found !'));
   return 0;
@@ -22,10 +21,15 @@ if (!outputPortCount) {
 let wroteOnce = false;
 
 function onStepPlayed(stepInfo) {
-  const sequenceName = stepInfo.sequenceName;
+  const pathMaxLength = 24;
+  const path = [...stepInfo.sequenceStack, stepInfo.sequenceName].join('/');
+  const truncated = path.length > pathMaxLength ? path.slice(path.length - pathMaxLength) : path;
+  const fixedSize = truncated.padEnd(pathMaxLength, ' ');
   const stepNumber = stepInfo.stepNumber;
   const messageBar = new Array(stepInfo.noteOnCount).fill('#').join('');
-  const string = `${sequenceName}[${stepNumber}] ${messageBar} `.padEnd(sequenceName.length + 3 + 16);
+  const t = stepInfo.timePosition + 1;
+  const context = `[${t}] ${fixedSize} [${stepNumber}]`;
+  const string = `${context} ${messageBar} `.padEnd(80);
 
   if (! wroteOnce) {
     wroteOnce = true;
@@ -58,7 +62,7 @@ async function main() {
     .option('-o, --output [output]', 'Midi output port to use')
     .action(async options => {
       const parsed = parseInt(options.output);
-      foundOutput = (isNaN(parsed) || parsed < 0 || parsed > outputPortCount) ? null : parsed;
+      foundOutput = (isNaN(parsed) || parsed < 0 || parsed > output.getPortCount()) ? null : parsed;
 
       if (foundOutput == null) {
         printAvailableMidiOutputDevices();
@@ -68,7 +72,7 @@ async function main() {
         await inquirer.prompt([{type: 'input', name: 'output', message: 'MIDI output'}])
           .then(answers => {
             const parsed = parseInt(answers.output);
-            foundOutput = (isNaN(parsed) || parsed < 0 || parsed > outputPortCount) ? null : parsed;
+            foundOutput = (isNaN(parsed) || parsed < 0 || parsed > output.getPortCount()) ? null : parsed;
           });
       }
 
@@ -104,7 +108,7 @@ function runProgram() {
 
 function printAvailableMidiOutputDevices() {
   console.log('Available MIDI output devices :');
-  for (let i = 0; i < outputPortCount; ++i) {
+  for (let i = 0; i < output.getPortCount(); ++i) {
     console.log(`${i} : ${output.getPortName(i)}`);
   }
 }

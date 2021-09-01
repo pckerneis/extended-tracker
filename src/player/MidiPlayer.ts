@@ -6,8 +6,11 @@ export class MidiPlayer {
   private readonly tracks: Map<number, Track> = new Map();
   private currentSequenceName: string;
   private currentSteps: Step[] = [];
-  private position = 0;
+  private stepPositionInSequence = 0;
   private stepsBySequenceName: MessageSequence;
+  private timePosition = 0;
+
+  private sequenceStack: string[] = [];
 
   public get currentSequence(): Step[] {
     return this.stepsBySequenceName[this.currentSequenceName] || [];
@@ -40,30 +43,26 @@ export class MidiPlayer {
       return;
     }
 
+    this.timePosition = 0;
     this.currentSequenceName = 'Program';
     this.currentSteps = this.stepsBySequenceName[this.currentSequenceName];
-    this.position = 0;
+    this.stepPositionInSequence = 0;
 
-    const handler = () => {
-      this.nextStep({onStepPlay, onEnded});
-    };
-
-    handler();
+    this.nextStep({onStepPlay, onEnded});
   }
 
   private advance(stepArguments: StepArguments) {
-    this.position++;
+    this.stepPositionInSequence++;
     this.nextStep(stepArguments);
-
   }
 
   private nextStep(stepArguments: StepArguments): void {
-    if (this.position >= this.currentSteps.length) {
+    if (this.stepPositionInSequence >= this.currentSteps.length) {
       stepArguments.onEnded();
       return;
     }
 
-    const step = this.currentSteps[this.position];
+    const step = this.currentSteps[this.stepPositionInSequence];
 
     if (step) {
       if (step.flag != null) {
@@ -90,10 +89,14 @@ export class MidiPlayer {
     }
 
     stepArguments.onStepPlay({
+      timePosition: this.timePosition,
+      sequenceStack: this.sequenceStack,
       sequenceName: this.currentSequenceName,
-      stepNumber: this.position,
+      stepNumber: this.stepPositionInSequence,
       noteOnCount: noteOnCounter,
     });
+
+    this.timePosition++;
 
     setTimeout(() => this.advance(stepArguments), 500);
   }
@@ -102,19 +105,19 @@ export class MidiPlayer {
     this.reinterpretCode();
 
     if (this.stepsBySequenceName[step.innerSequenceName] != null) {
-      const previousPosition = this.position;
-      const previousSequenceName = this.currentSequenceName;
+      const previousPosition = this.stepPositionInSequence;
 
+      this.sequenceStack.push(this.currentSequenceName);
       this.currentSequenceName = step.innerSequenceName;
       this.currentSteps = this.currentSequence;
-      this.position = 0;
+      this.stepPositionInSequence = 0;
 
       this.nextStep({
         ...stepArguments,
         onEnded: () => {
-          this.currentSequenceName = previousSequenceName;
+          this.currentSequenceName = this.sequenceStack.pop();
           this.currentSteps = this.currentSequence;
-          this.position = previousPosition + 1;
+          this.stepPositionInSequence = previousPosition + 1;
 
           this.nextStep(stepArguments);
         }
@@ -131,7 +134,7 @@ export class MidiPlayer {
     const jumpPosition = this.currentSteps.indexOf(flagStep);
 
     if (jumpPosition >= 0) {
-      this.position = jumpPosition;
+      this.stepPositionInSequence = jumpPosition;
     }
 
     this.nextStep(stepArguments);
