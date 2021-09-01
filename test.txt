@@ -1,13 +1,14 @@
 seqB = [
 p: 65, v: 20
 p: 64, v: 20
+# end
 ]
 
 seqC = [p: 75, v: 20 | p: 72, v: 40]
 
 seqA = [
 {seqC}
-{seqB}
+{seqB # end}
 ]
 
 

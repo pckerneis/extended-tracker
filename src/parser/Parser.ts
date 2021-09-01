@@ -242,10 +242,13 @@ export class Parser {
 
   private innerSequence(): Expr {
     const startToken = this.previous();
-    const expr = this.primary();
+    const sequenceName = this.consume([TokenType.IDENTIFIER], 'Expect a inner sequence name.');
+    let flagToken: Token;
+    let flagName: Token;
 
-    if (expr.kind !== Kind.VARIABLE) {
-      throw new ParseError(this.previous(), 'Expect a inner sequence name.');
+    if (this.match(this.flagToken)) {
+      flagToken = this.previous();
+      flagName = this.consume([TokenType.IDENTIFIER], 'Expect a flag name.');
     }
 
     this.consume([this.innerSequenceEndToken], `Expect ${TokenType.RIGHT_BRACKET} after a inner sequence`);
@@ -253,7 +256,9 @@ export class Parser {
 
     return {
       kind: Kind.INNER_SEQUENCE,
-      name: expr.name,
+      sequenceName,
+      flagName,
+      flagToken,
       startToken, endToken,
     };
   }

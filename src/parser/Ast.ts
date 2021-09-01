@@ -29,9 +29,11 @@ export interface Sequence {
 
 export interface InnerSequence {
   readonly kind: Kind.INNER_SEQUENCE;
-  readonly name: Token;
+  readonly sequenceName: Token;
   readonly startToken: Token;
   readonly endToken: Token;
+  readonly flagToken?: Token;
+  readonly flagName?: Token;
 }
 
 export interface TrackList {

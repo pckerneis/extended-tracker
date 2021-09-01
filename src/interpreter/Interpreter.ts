@@ -25,7 +25,12 @@ export interface Step {
   messages?: Message[];
   flag?: FlagMessage;
   jump?: JumpMessage;
-  innerSequenceName?: string;
+  innerSequence?: InnerSequenceMessage;
+}
+
+export interface InnerSequenceMessage {
+  sequenceName: string;
+  flagName?: string;
 }
 
 export interface MessageSequence {
@@ -115,14 +120,19 @@ export class Interpreter {
   }
 
   private static processInnerSequence(innerSequence: InnerSequence, expressions: Expr[], output: MessageSequence): Step {
-    const innerSequenceName: string = innerSequence.name.lexeme;
+    const innerSequenceName: string = innerSequence.sequenceName.lexeme;
     const sequenceDeclaration = this.findDeclaration(innerSequenceName, expressions);
 
     if (sequenceDeclaration != null && output[innerSequenceName] == null) {
       output[innerSequenceName] = this.readSequence(sequenceDeclaration, expressions, output);
     }
 
-    return {innerSequenceName};
+    return {
+      innerSequence: {
+        sequenceName: innerSequenceName,
+        flagName: innerSequence.flagName?.lexeme,
+      }
+    };
   }
 
   private static findDeclaration(variableName: string, expressions: Expr[]): Assign {

@@ -5,7 +5,6 @@ import {ErrorReporter} from '../error/ErrorReporter';
 export class MidiPlayer {
   private readonly tracks: Map<number, Track> = new Map();
   private currentSequenceName: string;
-  private currentSteps: Step[] = [];
   private stepPositionInSequence = 0;
   private stepsBySequenceName: MessageSequence;
   private timePosition = 0;
@@ -45,7 +44,6 @@ export class MidiPlayer {
 
     this.timePosition = 0;
     this.currentSequenceName = 'Program';
-    this.currentSteps = this.stepsBySequenceName[this.currentSequenceName];
     this.stepPositionInSequence = 0;
 
     this.nextStep({onStepPlay, onEnded});
@@ -57,12 +55,12 @@ export class MidiPlayer {
   }
 
   private nextStep(stepArguments: StepArguments): void {
-    if (this.stepPositionInSequence >= this.currentSteps.length) {
+    if (this.stepPositionInSequence >= this.currentSequence.length) {
       stepArguments.onEnded();
       return;
     }
 
-    const step = this.currentSteps[this.stepPositionInSequence];
+    const step = this.currentSequence[this.stepPositionInSequence];
 
     if (step) {
       if (step.flag != null) {
@@ -73,7 +71,7 @@ export class MidiPlayer {
         return this.jump(step, stepArguments);
       }
 
-      if (step.innerSequenceName != null) {
+      if (step.innerSequence != null) {
         return this.innerSequence(step, stepArguments);
       }
 
@@ -104,19 +102,24 @@ export class MidiPlayer {
   private innerSequence(step: Step, stepArguments: StepArguments): void {
     this.reinterpretCode();
 
-    if (this.stepsBySequenceName[step.innerSequenceName] != null) {
+    const { sequenceName, flagName } = step.innerSequence;
+
+    if (this.stepsBySequenceName[sequenceName] != null) {
       const previousPosition = this.stepPositionInSequence;
 
       this.sequenceStack.push(this.currentSequenceName);
-      this.currentSequenceName = step.innerSequenceName;
-      this.currentSteps = this.currentSequence;
-      this.stepPositionInSequence = 0;
+      this.currentSequenceName = sequenceName;
+
+      if (flagName) {
+        this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
+      } else {
+        this.stepPositionInSequence = 0;
+      }
 
       this.nextStep({
         ...stepArguments,
         onEnded: () => {
           this.currentSequenceName = this.sequenceStack.pop();
-          this.currentSteps = this.currentSequence;
           this.stepPositionInSequence = previousPosition + 1;
 
           this.nextStep(stepArguments);
@@ -133,7 +136,6 @@ export class MidiPlayer {
     if (step.jump.sequence) {
       if (this.stepsBySequenceName[step.jump.sequence] != null) {
         this.currentSequenceName = step.jump.sequence;
-        this.currentSteps = this.currentSequence;
         this.stepPositionInSequence = 0;
       } else {
         this.advance(stepArguments);
@@ -141,8 +143,7 @@ export class MidiPlayer {
     }
 
     if (step.jump.flag) {
-      const flagStep = this.currentSteps.find(s => s.flag?.name === step.jump.flag);
-      const jumpPosition = this.currentSteps.indexOf(flagStep);
+      const jumpPosition = this.findFlagPosition(step.jump.flag, this.currentSequence);
 
       if (jumpPosition >= 0) {
         this.stepPositionInSequence = jumpPosition;
@@ -150,6 +151,11 @@ export class MidiPlayer {
     }
 
     this.nextStep(stepArguments);
+  }
+
+  private findFlagPosition(flagName: string, steps: Step[]) {
+    const flagStep = steps.find(s => s.flag?.name === flagName);
+    return steps.indexOf(flagStep);
   }
 
   private sendMessages(step: Step): number {
@@ -181,7 +187,6 @@ export class MidiPlayer {
     const messageSequence = Interpreter.interpret(this.codeProvider.code, this.errorReporter);
 
     if (messageSequence != null) {
-      this.currentSteps = messageSequence[this.currentSequenceName];
       this.stepsBySequenceName = messageSequence;
     }
   }

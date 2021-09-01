@@ -157,6 +157,6 @@ test('should parse inner sequences', () => {
   expect(sequence.expressions[0].kind).toEqual('INNER_SEQUENCE');
 
   const flag = sequence.expressions[0] as InnerSequence;
-  expect(flag.name.lexeme).toBe('inner');
+  expect(flag.sequenceName.lexeme).toBe('inner');
 
 });
