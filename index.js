@@ -7,6 +7,7 @@ const midi = require('midi');
 const chokidar = require('chokidar');
 const Player = require('./dist/player/MidiPlayer').MidiPlayer;
 const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
+const {formatTime} = require('./dist/utils/time');
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
 
@@ -25,10 +26,11 @@ function onStepPlayed(stepInfo) {
   const path = [...stepInfo.sequenceStack, stepInfo.sequenceName].join('/');
   const truncated = path.length > pathMaxLength ? path.slice(path.length - pathMaxLength) : path;
   const fixedSize = truncated.padEnd(pathMaxLength, ' ');
-  const stepNumber = stepInfo.stepNumber;
+  const timeStep = stepInfo.timeStep;
   const messageBar = new Array(stepInfo.noteOnCount).fill('#').join('');
-  const t = stepInfo.timePosition + 1;
-  const context = `[${t}] ${fixedSize} [${stepNumber}]`;
+  const t = timeStep + 1;
+  const time = formatTime(stepInfo.timePosition);
+  const context = `${time} [${t}] ${fixedSize} [${timeStep}]`;
   const string = `${context} ${messageBar} `.padEnd(80);
 
   if (! wroteOnce) {

@@ -1,15 +1,20 @@
 import {CodeProvider, Interpreter, MessageSequence, Step} from '../interpreter/Interpreter';
 import {MidiOutput} from '../midi/MidiOutput';
 import {ErrorReporter} from '../error/ErrorReporter';
+import {Scheduler} from "../scheduler/Scheduler";
 
 export class MidiPlayer {
   private readonly tracks: Map<number, Track> = new Map();
   private currentSequenceName: string;
   private stepPositionInSequence = 0;
   private stepsBySequenceName: MessageSequence;
-  private timePosition = 0;
+  private timeStep = 0;
+
+  private nextStepTime = 0;
 
   private sequenceStack: string[] = [];
+
+  private scheduler: Scheduler = new Scheduler();
 
   public get currentSequence(): Step[] {
     return this.stepsBySequenceName[this.currentSequenceName] || [];
@@ -23,7 +28,7 @@ export class MidiPlayer {
   public static play(codeProvider: CodeProvider,
                      output: MidiOutput,
                      onEnded: Function,
-                     onStepPlay: Function,
+                     onStepPlay: StepPlayCallback,
                      errorReporter?: ErrorReporter): void {
     if (errorReporter == null) {
       errorReporter = {
@@ -34,7 +39,7 @@ export class MidiPlayer {
     player.doPlay(onEnded, onStepPlay);
   }
 
-  private doPlay(onEnded: Function, onStepPlay: Function): void {
+  private doPlay(onEnded: Function, onStepPlay: StepPlayCallback): void {
     this.reinterpretCode();
 
     if (this.stepsBySequenceName == null) {
@@ -42,11 +47,13 @@ export class MidiPlayer {
       return;
     }
 
-    this.timePosition = 0;
+    this.timeStep = 0;
     this.currentSequenceName = 'Program';
     this.stepPositionInSequence = 0;
 
     this.nextStep({onStepPlay, onEnded});
+
+    this.scheduler.start();
   }
 
   private advance(stepArguments: StepArguments) {
@@ -87,16 +94,22 @@ export class MidiPlayer {
     }
 
     stepArguments.onStepPlay({
-      timePosition: this.timePosition,
+      timeStep: this.timeStep,
+      timePosition: this.nextStepTime,
       sequenceStack: this.sequenceStack,
       sequenceName: this.currentSequenceName,
       stepNumber: this.stepPositionInSequence,
       noteOnCount: noteOnCounter,
     });
 
-    this.timePosition++;
+    this.timeStep++;
 
-    setTimeout(() => this.advance(stepArguments), 500);
+    this.scheduleAdvance(stepArguments);
+  }
+
+  private scheduleAdvance(stepArguments: StepArguments): void {
+    this.nextStepTime += 0.5;
+    this.scheduler.schedule(this.nextStepTime, () => this.advance(stepArguments));
   }
 
   private innerSequence(step: Step, stepArguments: StepArguments): void {
@@ -232,7 +245,18 @@ class Track {
   }
 }
 
+export interface StepPlayInfo {
+  timeStep: number;
+  timePosition: number;
+  sequenceStack: string[];
+  sequenceName: string;
+  stepNumber: number;
+  noteOnCount: number;
+}
+
+export type StepPlayCallback = (info: StepPlayInfo) => void;
+
 interface StepArguments {
-  onStepPlay: Function
+  onStepPlay: StepPlayCallback;
   onEnded: Function
 }
