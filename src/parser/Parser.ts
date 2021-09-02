@@ -202,6 +202,15 @@ export class Parser {
         break;
       }
 
+      if (this.match(this.paramSeparator)) {
+        expressions.push({ kind: Kind.EMPTY_PARAM });
+
+        while (this.check(this.paramSeparator))
+          this.advance();
+
+        continue;
+      }
+
       const parsed = this.param();
       if (parsed != null) {
         expressions.push(parsed);

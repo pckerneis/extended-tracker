@@ -7,6 +7,7 @@ export enum Kind {
   VARIABLE = 'VARIABLE',
   ASSIGN = 'ASSIGN',
   PARAM = 'PARAM',
+  EMPTY_PARAM = 'EMPTY_PARAM',
   PARAMS = 'PARAMS',
   LOGICAL = 'LOGICAL',
   RL_UNARY = 'RL_UNARY',
@@ -63,6 +64,10 @@ export interface Param {
   readonly value: Expr;
   readonly assignee: Token;
   readonly colon: Token;
+}
+
+export interface EmptyParam {
+  readonly kind: Kind.EMPTY_PARAM;
 }
 
 export interface ParamList {
@@ -131,20 +136,22 @@ export interface Jump {
 }
 
 export type Expr =
-  Sequence
-  | InnerSequence
+  | Assign
   | Binary
   | Call
-  | RLUnary
-  | Literal
+  | EmptyParam
+  | Flag
   | Grouping
-  | Assign
-  | Variable
-  | TernaryCondition
+  | InnerSequence
+  | Jump
+  | Literal
   | Logical
   | Param
-  | Silence
   | ParamList
+  | RLUnary
+  | Sequence
+  | Silence
+  | TernaryCondition
   | TrackList
-  | Flag
-  | Jump;
+  | Variable
+;
