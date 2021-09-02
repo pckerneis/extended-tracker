@@ -181,6 +181,15 @@ export class Parser {
         break;
       }
 
+      if (this.check(this.trackSeparator)) {
+        tracks.push({
+          kind: Kind.PARAMS,
+          params : [],
+        });
+
+        continue;
+      }
+
       const params: Expr[] = [];
 
       params.push(...this.paramList());
@@ -205,8 +214,9 @@ export class Parser {
       if (this.match(this.paramSeparator)) {
         expressions.push({ kind: Kind.EMPTY_PARAM });
 
-        while (this.check(this.paramSeparator))
+        while (this.check(this.paramSeparator)) {
           this.advance();
+        }
 
         continue;
       }
