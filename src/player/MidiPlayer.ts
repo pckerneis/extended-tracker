@@ -25,7 +25,7 @@ export class MidiPlayer {
   private _speed: number = 1;
 
   set speed(speed: number) {
-    if (! isNaN(speed) && speed > 0) {
+    if (!isNaN(speed) && speed > 0) {
       this._speed = speed;
     } else {
       // TODO use error reporter?
@@ -68,7 +68,12 @@ export class MidiPlayer {
     this.reinterpretCode();
 
     if (this.latestInterpretedCode) {
-      this.playHead = PlayHead.createAtRoot(this, 'Root', {onEnded, onStepPlay}, 0.25, 0);
+      this.playHead = PlayHead.createAtRoot(this, 'Root', {
+        onEnded: () => {
+          this.output.allSoundOff();
+          onEnded();
+        }, onStepPlay
+      }, 0.25, 0);
       this._scheduler.start();
     } else {
       onEnded();
@@ -106,7 +111,7 @@ class PlayHead {
   private sequenceStack: { name: string, steps: Step[] }[] = [];
 
   public set stepDuration(stepDuration: number) {
-    if (! isNaN(stepDuration) && stepDuration > 0) {
+    if (!isNaN(stepDuration) && stepDuration > 0) {
       this._stepDuration = stepDuration;
     } else {
       // TODO use error reporter?

@@ -11,4 +11,8 @@ export class MidiOutput {
     const c = Math.min(Math.max(1, channel), 16)
     this.output.sendMessage([127 + c, note, velocity]);
   }
+
+  public allSoundOff(): void {
+    this.output.sendMessage([176, 120, 0]);
+  }
 }
