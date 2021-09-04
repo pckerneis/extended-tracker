@@ -175,7 +175,6 @@ class PlayHead {
             firstEnded = true;
 
             if (secondEnded) {
-              console.log('both ended')
               this.nextStepTime = leftHead.nextStepTime;
               this.advance(stepArguments);
             }
@@ -190,7 +189,6 @@ class PlayHead {
             secondEnded = true;
 
             if (firstEnded) {
-              console.log('both ended')
               this.nextStepTime = rightHead.nextStepTime;
               this.advance(stepArguments);
             }
@@ -210,7 +208,6 @@ class PlayHead {
             firstEnded = true;
 
             if (!secondEnded) {
-              console.log('any ended')
               this.nextStepTime = leftHead.nextStepTime;
               this.advance(stepArguments);
             }
@@ -225,7 +222,6 @@ class PlayHead {
             secondEnded = true;
 
             if (!firstEnded) {
-              console.log('any ended')
               this.nextStepTime = rightHead.nextStepTime;
               this.advance(stepArguments);
             }
