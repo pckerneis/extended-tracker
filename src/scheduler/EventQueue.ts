@@ -52,14 +52,6 @@ export class EventQueue<EventType> {
         return scheduledEvent.ref;
     }
 
-    public remove(eventRef: EventRef): void {
-        this._events = this.events.filter((e) => e.ref !== eventRef);
-    }
-
-    public clear(): void {
-        this._events = [];
-    }
-
     // Recursive divide and conquer to find insert index in already sorted array
     private insertIndex(time: number, min: number, max: number): number {
         const range = max - min;

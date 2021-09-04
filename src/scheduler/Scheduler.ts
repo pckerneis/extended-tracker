@@ -3,7 +3,7 @@ import {EventQueue, EventRef} from './EventQueue';
 export class Scheduler {
 
   public static readonly MIN_INTERVAL: number = 0;
-  public static readonly DEFAULT_LOOKAHEAD: number = 0.050;
+  public static readonly DEFAULT_LOOKAHEAD: number = 0.080;
 
   public onEnded: Function;
 
@@ -21,7 +21,7 @@ export class Scheduler {
       private _interval: number = 0,
       private _lookAhead: number = Scheduler.DEFAULT_LOOKAHEAD,
       private _eventQueue: EventQueue<Function> = new EventQueue(),
-      private _clockFunction: () => number = null,
+      private readonly _clockFunction: () => number = null,
   ) {
     // Constrain values by using public setters
     this.interval = _interval;
@@ -29,14 +29,6 @@ export class Scheduler {
 
     // Using default time provider if none is specified
     this._clockFunction = _clockFunction || systemNowInSeconds;
-  }
-
-  public set clockFunction(clockFunction: () => number) {
-    this._clockFunction = clockFunction;
-  }
-
-  public get running(): boolean {
-    return this._running;
   }
 
   public get interval(): number {
@@ -55,14 +47,6 @@ export class Scheduler {
     this._lookAhead = Math.max(0, v);
   }
 
-  public get eventQueue(): EventQueue<Function> {
-    return this._eventQueue;
-  }
-
-  public now(): number {
-    return this._now;
-  }
-
   public start(position: number = 0): void {
     this.prepareToRun(position);
     this.run();
@@ -75,29 +59,8 @@ export class Scheduler {
     }
   }
 
-  public runSync(start: number, end: number): void {
-    this.prepareToRun(start);
-
-    let next = this._eventQueue.next(end);
-
-    while (next != null) {
-      next.event();
-      next = this._eventQueue.next(end);
-    }
-
-    this._running = false;
-  }
-
-  public clearQueue(): void {
-    this._eventQueue.clear();
-  }
-
   public schedule(time: number, event: Function): EventRef {
     return this._eventQueue.add(time, event);
-  }
-
-  public cancel(eventRef: EventRef): void {
-    this._eventQueue.remove(eventRef);
   }
 
   private prepareToRun(startPosition: number): void {

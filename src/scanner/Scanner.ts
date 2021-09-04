@@ -1,4 +1,4 @@
-import {operators, Token, TokenType} from './tokens';
+import {Token, TokenType} from './tokens';
 
 export class Scanner {
   private tokens: Token[] = [];
@@ -23,10 +23,6 @@ export class Scanner {
 
   public static isAlphaNumeric(c: string | null): boolean {
     return typeof c === 'string' && this.isAlpha(c) || this.isDigit(c);
-  }
-
-  public static isOperator(c: string | null): boolean {
-    return typeof c === 'string' && operators.indexOf(c) >= 0;
   }
 
   public static scan(source: string): Token[] {

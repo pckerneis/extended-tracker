@@ -1,11 +1,11 @@
 import {
   Assign,
+  AstNodeKind,
   Binary,
   Expr,
   Flag,
   InnerSequence,
   Jump,
-  AstNodeKind,
   Literal,
   Logical,
   RLUnary,
@@ -87,7 +87,6 @@ export type SequenceLike = SequenceDeclaration | SequenceOperation;
 export type Assignable = SequenceDeclaration | SequenceOperation | number | string | boolean;
 
 export class Interpreter {
-  public static PROGRAM_VARIABLE: string = 'Program';
 
   public static interpret(code: string, errorReporter: ErrorReporter): MessageSequence {
     try {
@@ -100,33 +99,18 @@ export class Interpreter {
   }
 
   private static readProgram(expressions: Expr[]): MessageSequence {
-    const programDeclaration = this.findDeclaration(this.PROGRAM_VARIABLE, expressions);
-    const messageSequence: MessageSequence = { Program: null };
-    messageSequence.Program = this.readSequence(programDeclaration.value, expressions, messageSequence);
-    return messageSequence;
-  }
+    let output = {};
 
-  private static readSequence(maybeSequence: Expr, topLevelExpressions: Expr[], output: MessageSequence): SequenceDeclaration | SequenceOperation {
-    if (!maybeSequence) {
-      return { kind: InstructionKind.SequenceDeclaration, steps: [] };
-    }
-
-    if (maybeSequence.kind === AstNodeKind.SEQUENCE) {
-      return this.evaluateSequenceDeclaration(maybeSequence, topLevelExpressions, output);
-    } else if (maybeSequence.kind === AstNodeKind.BINARY) {
-      const { left, right } = maybeSequence;
-      return {
-        kind: InstructionKind.SequenceOperation,
-        left: this.readSequence(left, topLevelExpressions, output),
-        right: this.readSequence(right, topLevelExpressions, output),
+    expressions.forEach(expression => {
+      if (expression.kind === AstNodeKind.ASSIGN && output[expression.assignee.lexeme] == null) {
+        output[expression.assignee.lexeme] = this.evaluate(expression.value, expressions);
       }
-    }
+    });
 
-    console.debug('hey')
-    return { kind: InstructionKind.SequenceDeclaration, steps: [] };
+    return output;
   }
 
-  private static processTracks(channelsOrFlagOrJump: TrackList, topLevelExpressions: Expr[], output: MessageSequence): Step {
+  private static processTracks(channelsOrFlagOrJump: TrackList, topLevelExpressions: Expr[]): Step {
     const messages: Message[] = [];
 
     channelsOrFlagOrJump.tracks.forEach((params, channelIndex) => {
@@ -141,7 +125,7 @@ export class Interpreter {
       if (params.kind === AstNodeKind.PARAMS) {
         params.params.forEach(param => {
           if (param.kind === AstNodeKind.PARAM) {
-            message.params[param.assignee.lexeme] = this.evaluate(param?.value, topLevelExpressions, output);
+            message.params[param.assignee.lexeme] = this.evaluate(param?.value, topLevelExpressions);
 
             if (param.assignee.lexeme === '-') {
               message.silent = true;
@@ -169,15 +153,9 @@ export class Interpreter {
     return {kind: InstructionKind.Step, jump};
   }
 
-  private static processInnerSequence(innerSequence: InnerSequence, topLevelExpressions: Expr[], output: MessageSequence): Step {
+  private static processInnerSequence(innerSequence: InnerSequence, topLevelExpressions: Expr[]): Step {
     if (innerSequence.maybeSequence.kind === 'SEQUENCE_FLAG_REF') {
       const ref = innerSequence.maybeSequence as SequenceFlagRef;
-      const innerSequenceName: string = ref.sequenceName.lexeme;
-      const sequenceDeclaration = this.findDeclaration(innerSequenceName, topLevelExpressions);
-
-      if (sequenceDeclaration != null && output[innerSequenceName] == null) {
-        output[innerSequenceName] = this.readSequence(sequenceDeclaration.value, topLevelExpressions, output);
-      }
 
       return {
         kind: InstructionKind.Step,
@@ -191,13 +169,6 @@ export class Interpreter {
         }
       };
     } else if (innerSequence.maybeSequence.kind === 'VARIABLE') {
-      const innerSequenceName: string = innerSequence.maybeSequence.name.lexeme;
-      const sequenceDeclaration = this.findDeclaration(innerSequenceName, topLevelExpressions);
-
-      if (sequenceDeclaration != null && output[innerSequenceName] == null) {
-        output[innerSequenceName] = this.readSequence(sequenceDeclaration.value, topLevelExpressions, output);
-      }
-
       return {
         kind: InstructionKind.Step,
         innerSequence: {
@@ -215,8 +186,8 @@ export class Interpreter {
           kind: InstructionKind.InnerSequence,
           content: {
             kind: InstructionKind.SequenceOperation,
-            left: this.evaluate(innerSequence.maybeSequence.left, topLevelExpressions, output),
-            right: this.evaluate(innerSequence.maybeSequence.right, topLevelExpressions, output),
+            left: this.evaluate(innerSequence.maybeSequence.left, topLevelExpressions),
+            right: this.evaluate(innerSequence.maybeSequence.right, topLevelExpressions),
           }
         }
       }
@@ -228,33 +199,33 @@ export class Interpreter {
       && expr.assignee.lexeme === variableName) as Assign;
   }
 
-  private static evaluate(expr: Expr | undefined, topLevelExpressions: Expr[], output: MessageSequence): any {
+  private static evaluate(expr: Expr | undefined, topLevelExpressions: Expr[]): any {
     if (! expr) {
       return null;
     }
 
     switch (expr.kind) {
       case 'VARIABLE':
-        return this.evaluateVariable(expr, topLevelExpressions, output);
+        return this.evaluateVariable(expr, topLevelExpressions);
       case 'LITERAL':
         return evaluateLiteral(expr);
       case 'RL_UNARY':
-        return this.evaluateRLUnary(expr, topLevelExpressions, output);
+        return this.evaluateRLUnary(expr, topLevelExpressions);
       case 'BINARY':
-        return this.evaluateBinary(expr, topLevelExpressions, output);
+        return this.evaluateBinary(expr, topLevelExpressions);
       case 'GROUPING':
-        return this.evaluate(expr.expr, topLevelExpressions, output);
+        return this.evaluate(expr.expr, topLevelExpressions);
       case 'TERNARY_COND':
-        return this.evaluateTernaryCondition(expr, topLevelExpressions, output);
+        return this.evaluateTernaryCondition(expr, topLevelExpressions);
       case 'LOGICAL':
-        return this.evaluateLogical(expr, topLevelExpressions, output);
+        return this.evaluateLogical(expr, topLevelExpressions);
       case 'SEQUENCE':
-        return this.evaluateSequenceDeclaration(expr, topLevelExpressions, output);
+        return this.evaluateSequenceDeclaration(expr, topLevelExpressions);
     }
   }
 
-  private static evaluateLogical(expr: Logical, topLevelExpressions: Expr[], output: MessageSequence): any {
-    const left = this.evaluate(expr.left, topLevelExpressions, output);
+  private static evaluateLogical(expr: Logical, topLevelExpressions: Expr[]): any {
+    const left = this.evaluate(expr.left, topLevelExpressions);
 
     if (expr.operator.type == TokenType.PIPE) {
       if (isTruthy(left)) return left;
@@ -262,21 +233,21 @@ export class Interpreter {
       if (!isTruthy(left)) return left;
     }
 
-    return this.evaluate(expr.right, topLevelExpressions, output);
+    return this.evaluate(expr.right, topLevelExpressions);
   }
 
-  private static evaluateTernaryCondition(expr: TernaryCondition, topLevelExpressions: Expr[], output: MessageSequence): any {
-    const predicate = this.evaluate(expr.condition, topLevelExpressions, output);
+  private static evaluateTernaryCondition(expr: TernaryCondition, topLevelExpressions: Expr[]): any {
+    const predicate = this.evaluate(expr.condition, topLevelExpressions);
 
     if (predicate) {
-      return this.evaluate(expr.ifBranch, topLevelExpressions, output);
+      return this.evaluate(expr.ifBranch, topLevelExpressions);
     } else {
-      return this.evaluate(expr.elseBranch, topLevelExpressions, output)
+      return this.evaluate(expr.elseBranch, topLevelExpressions)
     }
   }
 
-  private static evaluateRLUnary(expr: RLUnary, topLevelExpressions: Expr[], output: MessageSequence): any {
-    const right = this.evaluate(expr.right, topLevelExpressions, output);
+  private static evaluateRLUnary(expr: RLUnary, topLevelExpressions: Expr[]): any {
+    const right = this.evaluate(expr.right, topLevelExpressions);
 
     switch (expr.operator.type) {
       case TokenType.BANG:
@@ -288,9 +259,9 @@ export class Interpreter {
     return null;
   }
 
-  private static evaluateBinary(expr: Binary, topLevelExpressions: Expr[], output: MessageSequence): any {
-    const left = this.evaluate(expr.left, topLevelExpressions, output);
-    const right = this.evaluate(expr.right, topLevelExpressions, output);
+  private static evaluateBinary(expr: Binary, topLevelExpressions: Expr[]): any {
+    const left = this.evaluate(expr.left, topLevelExpressions);
+    const right = this.evaluate(expr.right, topLevelExpressions);
 
     switch (expr.operator.type) {
       case TokenType.PIPE:
@@ -322,8 +293,8 @@ export class Interpreter {
     return null;
   }
 
-  private static evaluateVariable(expr: Variable, topLevelExpressions: Expr[], output: MessageSequence): any {
-    return this.evaluate(this.findDeclaration(expr.name.lexeme, topLevelExpressions).value, topLevelExpressions, output);
+  private static evaluateVariable(expr: Variable, topLevelExpressions: Expr[]): any {
+    return this.evaluate(this.findDeclaration(expr.name.lexeme, topLevelExpressions).value, topLevelExpressions);
   }
 
   private static asNumber(thing: any): number {
@@ -344,7 +315,7 @@ export class Interpreter {
     console.debug(thing);
   }
 
-  private static evaluateSequenceDeclaration(sequence: Sequence, topLevelExpressions: Expr[], output: MessageSequence): SequenceDeclaration {
+  private static evaluateSequenceDeclaration(sequence: Sequence, topLevelExpressions: Expr[]): SequenceDeclaration {
     return {
       kind: InstructionKind.SequenceDeclaration,
       steps: sequence.expressions.map(channelsOrFlagOrJump => {
@@ -353,9 +324,9 @@ export class Interpreter {
         } else if (channelsOrFlagOrJump.kind === AstNodeKind.JUMP) {
           return this.processJumpStep(channelsOrFlagOrJump);
         } else if (channelsOrFlagOrJump.kind === AstNodeKind.TRACKS) {
-          return this.processTracks(channelsOrFlagOrJump, topLevelExpressions, output);
+          return this.processTracks(channelsOrFlagOrJump, topLevelExpressions);
         } else if (channelsOrFlagOrJump.kind === AstNodeKind.INNER_SEQUENCE) {
-          return this.processInnerSequence(channelsOrFlagOrJump, topLevelExpressions, output);
+          return this.processInnerSequence(channelsOrFlagOrJump, topLevelExpressions);
         }
       })
     };

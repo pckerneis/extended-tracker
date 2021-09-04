@@ -46,7 +46,7 @@ Chords = [
     ,
 ]
 
-melodyVel = 60
+melodyVel = 65
 
 Melody = [
 p: 71, v: melodyVel
@@ -101,7 +101,7 @@ p: 69
 -
 ]
 
-Program = [
+Root = [
     # start
     {Chords || Melody}
     @ start

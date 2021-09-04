@@ -43,13 +43,6 @@ export interface CodePosition {
   readonly column: number,
 }
 
-export function asCodePosition(x: number, y: number): CodePosition {
-  return {
-    line: y,
-    column: x,
-  }
-}
-
 export class Token {
   constructor(public readonly type: TokenType,
               public lexeme: string,

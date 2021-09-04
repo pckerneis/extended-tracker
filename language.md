@@ -2,7 +2,7 @@
 
 ## Comments
 
-Comments allow to increase code readability but they have no impact on code.
+Comments allow increasing code readability but they have no impact on code.
 
 ```
 // This is a comment
