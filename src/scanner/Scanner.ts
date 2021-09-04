@@ -88,9 +88,6 @@ export class Scanner {
         case '*':
           this.addToken(TokenType.STAR);
           break;
-        case '/':
-          this.addToken(TokenType.SLASH);
-          break;
         case '%':
           this.addToken(TokenType.MODULO);
           break;
@@ -114,6 +111,15 @@ export class Scanner {
           break;
         case '#':
           this.addToken(TokenType.DASH);
+          break;
+        case '/':
+          if (this.match(TokenType.SLASH)) {
+            while (this.peek() !== '\n') {
+              this.advance();
+            }
+          } else {
+            this.addToken(TokenType.SLASH);
+          }
           break;
         case '|':
           this.addToken(this.match('|') ? TokenType.DOUBLE_PIPE : TokenType.PIPE);
