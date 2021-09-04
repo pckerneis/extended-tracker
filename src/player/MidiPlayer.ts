@@ -172,7 +172,7 @@ class PlayHead {
         ...stepArguments,
         onEnded: () => {
           this.stepPositionInSequence = previousPosition + 1;
-          this.popSequence();
+          this.popSequenceAndRefreshCurrent();
           this.nextStep(stepArguments);
         }
       });
@@ -343,7 +343,7 @@ class PlayHead {
         this.nextStep({
           ...stepArguments,
           onEnded: () => {
-            this.popSequence();
+            this.popSequenceAndRefreshCurrent();
             this.stepPositionInSequence = previousPosition + 1;
             this.nextStep(stepArguments);
           }
@@ -358,6 +358,7 @@ class PlayHead {
 
   private jump(step: Step, stepArguments: StepArguments): void {
     this.reinterpretCode();
+    this.refreshCurrent();
 
     if (step.jump.sequence) {
       if (this.stepsBySequenceName[step.jump.sequence] != null) {
@@ -419,6 +420,23 @@ class PlayHead {
 
   private popSequence(): void {
     this.sequenceStack.pop();
+  }
+
+  private popSequenceAndRefreshCurrent(): void {
+    this.popSequence();
+    this.refreshCurrent();
+  }
+
+  private refreshCurrent(): void {
+    const current = this.sequenceStack[this.sequenceStack.length - 1];
+
+    if (current && Object.keys(this.stepsBySequenceName).includes(current.name)) {
+      const maybeSequence = this.stepsBySequenceName[current.name];
+
+      if (typeof maybeSequence === 'object' && maybeSequence.kind === 'SequenceDeclaration') {
+        current.steps = maybeSequence.steps;
+      }
+    }
   }
 
   private controlMessage(controlMessage: ControlMessage, stepArguments: StepArguments) {
