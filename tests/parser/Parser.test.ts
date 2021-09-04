@@ -1,7 +1,7 @@
 import {Assign, Flag, SequenceFlagRef, Jump, Logical, Sequence, InnerSequence, Variable} from '../../src/parser/Ast';
 import {Parser} from '../../src/parser/Parser';
 import {Scanner} from '../../src/scanner/Scanner';
-import {Kind, TernaryCondition, TrackList} from "../../dist/parser/Ast";
+import {AstNodeKind, TernaryCondition, TrackList} from "../../dist/parser/Ast";
 
 test('should parse whitespace', () => {
   const testCodes = [
@@ -28,13 +28,13 @@ test('should parse an empty sequence declaration', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
   expect(assign.assignee.lexeme).toEqual('mySeq');
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(0);
 });
@@ -70,11 +70,11 @@ test('should parse a sequence declaration', () => {
     const exprs = Parser.parse(tokens);
 
     expect(exprs.length).toEqual(1);
-    expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+    expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
     const assign = exprs[0] as Assign;
 
-    expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+    expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
     const sequence = assign.value as Sequence;
     expect(sequence.expressions.length).toBe(3);
@@ -94,11 +94,11 @@ test('should parse flags', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(1);
@@ -118,20 +118,20 @@ test('should parse outer jump', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(2);
 
-  expect(sequence.expressions[0].kind).toEqual(Kind.JUMP);
+  expect(sequence.expressions[0].kind).toEqual(AstNodeKind.JUMP);
   const jump = sequence.expressions[0] as Jump;
   expect(jump.sequence.lexeme).toBe('seq');
 
-  expect(sequence.expressions[1].kind).toEqual(Kind.JUMP);
+  expect(sequence.expressions[1].kind).toEqual(AstNodeKind.JUMP);
   const secondJump = sequence.expressions[1] as Jump;
   expect(secondJump.sequence.lexeme).toBe('seq2');
   expect(secondJump.flag.lexeme).toBe('flag');
@@ -146,18 +146,18 @@ test('should parse inner sequences names', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(1);
-  expect(sequence.expressions[0].kind).toEqual(Kind.INNER_SEQUENCE);
+  expect(sequence.expressions[0].kind).toEqual(AstNodeKind.INNER_SEQUENCE);
 
   const innerSequence = sequence.expressions[0] as InnerSequence;
-  expect(innerSequence.maybeSequence.kind).toBe(Kind.VARIABLE);
+  expect(innerSequence.maybeSequence.kind).toBe(AstNodeKind.VARIABLE);
 
   const sequenceName = innerSequence.maybeSequence as Variable;
   expect(sequenceName.name.lexeme).toBe('inner');
@@ -172,18 +172,18 @@ test('should parse inner sequences names with flag', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(1);
-  expect(sequence.expressions[0].kind).toEqual(Kind.INNER_SEQUENCE);
+  expect(sequence.expressions[0].kind).toEqual(AstNodeKind.INNER_SEQUENCE);
 
   const innerSequence = sequence.expressions[0] as InnerSequence;
-  expect(innerSequence.maybeSequence.kind).toBe(Kind.SEQUENCE_FLAG_REF);
+  expect(innerSequence.maybeSequence.kind).toBe(AstNodeKind.SEQUENCE_FLAG_REF);
 
   const flag = innerSequence.maybeSequence as SequenceFlagRef;
   expect(flag.sequenceName.lexeme).toBe('inner');
@@ -202,15 +202,15 @@ test('should parse tracks', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.SEQUENCE);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
 
   const sequence = assign.value as Sequence;
   expect(sequence.expressions.length).toBe(5);
-  expect(sequence.expressions[0].kind).toEqual(Kind.TRACKS);
+  expect(sequence.expressions[0].kind).toEqual(AstNodeKind.TRACKS);
 
   expect((sequence.expressions[0] as TrackList).tracks.length).toBe(2);
   expect((sequence.expressions[1] as TrackList).tracks.length).toBe(3);
@@ -225,20 +225,20 @@ test('should parse sequence operations', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.LOGICAL);
+  expect(assign.value.kind).toEqual(AstNodeKind.LOGICAL);
 
   const first = assign.value as Logical;
-  expect(first.left.kind).toBe(Kind.SEQUENCE);
-  expect(first.right.kind).toBe(Kind.LOGICAL);
+  expect(first.left.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(first.right.kind).toBe(AstNodeKind.LOGICAL);
   expect(first.operator.lexeme).toEqual('||');
 
   const second = first.right as Logical;
-  expect(second.left.kind).toBe(Kind.SEQUENCE);
-  expect(second.right.kind).toBe(Kind.SEQUENCE);
+  expect(second.left.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(second.right.kind).toBe(AstNodeKind.SEQUENCE);
   expect(second.operator.lexeme).toEqual('&');
 });
 
@@ -250,16 +250,16 @@ test('should parse ternary conditions', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.TERNARY_COND);
+  expect(assign.value.kind).toEqual(AstNodeKind.TERNARY_COND);
 
   const first = assign.value as TernaryCondition;
-  expect(first.condition.kind).toBe(Kind.BINARY);
-  expect(first.ifBranch.kind).toBe(Kind.SEQUENCE);
-  expect(first.elseBranch.kind).toBe(Kind.SEQUENCE);
+  expect(first.condition.kind).toBe(AstNodeKind.BINARY);
+  expect(first.ifBranch.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(first.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
 });
 
 test.skip('should parse ternary steps', () => {
@@ -269,15 +269,15 @@ test.skip('should parse ternary steps', () => {
   const exprs = Parser.parse(tokens);
 
   expect(exprs.length).toEqual(1);
-  expect(exprs[0].kind).toEqual(Kind.ASSIGN);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(Kind.TERNARY_COND);
+  expect(assign.value.kind).toEqual(AstNodeKind.TERNARY_COND);
 
   const first = assign.value as TernaryCondition;
-  expect(first.condition.kind).toBe(Kind.BINARY);
-  expect(first.ifBranch.kind).toBe(Kind.SEQUENCE);
-  expect(first.elseBranch.kind).toBe(Kind.SEQUENCE);
+  expect(first.condition.kind).toBe(AstNodeKind.BINARY);
+  expect(first.ifBranch.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(first.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
 });
 

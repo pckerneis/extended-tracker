@@ -18,7 +18,7 @@ import {
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
 import {ErrorReporter} from '../error/ErrorReporter';
-import {TokenType} from "../scanner/Tokens";
+import {Token, TokenType} from "../scanner/Tokens";
 
 export enum InstructionKind {
   Message = 'Message',
@@ -72,8 +72,11 @@ export interface SequenceDeclaration {
   steps: Step[];
 }
 
+export type SequenceOperationKind = 'left' | 'all' | 'any';
+
 export interface SequenceOperation {
   kind: InstructionKind.SequenceOperation;
+  operation: SequenceOperationKind;
   left: SequenceLike;
   right: SequenceLike;
 }
@@ -85,6 +88,15 @@ export interface MessageSequence {
 export type SequenceLike = SequenceDeclaration | SequenceOperation;
 
 export type Assignable = SequenceDeclaration | SequenceOperation | number | string | boolean;
+
+function findSequenceOperation(operator: Token): SequenceOperationKind {
+  switch(operator.lexeme) {
+    case '&': return 'all';
+    case '||': return 'any';
+  }
+
+  throw new Error('Unhandled sequence operation token ' + operator.lexeme);
+}
 
 export class Interpreter {
 
@@ -186,6 +198,7 @@ export class Interpreter {
           kind: InstructionKind.InnerSequence,
           content: {
             kind: InstructionKind.SequenceOperation,
+            operation: findSequenceOperation(innerSequence.maybeSequence.operator),
             left: this.evaluate(innerSequence.maybeSequence.left, topLevelExpressions),
             right: this.evaluate(innerSequence.maybeSequence.right, topLevelExpressions),
           }
@@ -224,16 +237,24 @@ export class Interpreter {
     }
   }
 
-  private static evaluateLogical(expr: Logical, topLevelExpressions: Expr[]): any {
+  private static evaluateLogical(expr: Logical, topLevelExpressions: Expr[]): Assignable {
     const left = this.evaluate(expr.left, topLevelExpressions);
+    const right = this.evaluate(expr.right, topLevelExpressions);
 
-    if (expr.operator.type == TokenType.PIPE) {
-      if (isTruthy(left)) return left;
+    if (typeof left === 'object' && typeof right === 'object') {
+      return {
+        kind: InstructionKind.SequenceOperation,
+        operation: findSequenceOperation(expr.operator),
+        left,
+        right,
+      };
     } else {
-      if (!isTruthy(left)) return left;
+      if (expr.operator.type === TokenType.AMPERSAND) {
+        return left && right;
+      } else {
+        return left || right;
+      }
     }
-
-    return this.evaluate(expr.right, topLevelExpressions);
   }
 
   private static evaluateTernaryCondition(expr: TernaryCondition, topLevelExpressions: Expr[]): any {
@@ -331,10 +352,6 @@ export class Interpreter {
       })
     };
   }
-}
-
-function isTruthy(object: any): boolean {
-  return !!object;
 }
 
 function asBoolean(thing: any): boolean {
