@@ -20,6 +20,7 @@ export enum AstNodeKind {
   FLAG = 'FLAG',
   JUMP = 'JUMP',
   SILENCE = 'SILENCE',
+  CONTROL_MESSAGE = 'CONTROL_MESSAGE',
 }
 
 export interface Sequence {
@@ -141,10 +142,18 @@ export interface Jump {
   readonly flagToken: Token;
 }
 
+export interface Control {
+  kind: AstNodeKind.CONTROL_MESSAGE;
+  token: Token;
+  target: Token;
+  params: Expr[];
+}
+
 export type Expr =
   | Assign
   | Binary
   | Call
+  | Control
   | EmptyParam
   | Flag
   | Grouping

@@ -1,5 +1,5 @@
 import {Token, TokenType} from '../scanner/tokens';
-import {Expr, Flag, Jump, AstNodeKind, SequenceFlagRef} from './Ast';
+import {Expr, Flag, Jump, AstNodeKind, SequenceFlagRef, Control} from './Ast';
 
 export class Parser {
   private current: number = 0;
@@ -19,6 +19,8 @@ export class Parser {
   private readonly jumpToken = TokenType.AT;
 
   private readonly silenceToken = TokenType.MINUS;
+
+  private readonly controlMessageToken = TokenType.DOLLAR;
 
   constructor(public readonly tokens: Token[]) {
   }
@@ -107,7 +109,9 @@ export class Parser {
         break;
       }
 
-      if (this.match(this.jumpToken)) {
+      if (this.match(this.controlMessageToken)) {
+        expressions.push(this.controlMessage())
+      } else if (this.match(this.jumpToken)) {
         expressions.push(this.jump());
       } else if (this.match(this.flagToken)) {
         expressions.push(this.flag());
@@ -472,6 +476,19 @@ export class Parser {
     } else {
       throw new Error('Expected flag name after ' + this.jumpToken);
     }
+  }
+
+  private controlMessage(): Control {
+    const token = this.previous();
+    const target = this.consume([TokenType.IDENTIFIER], 'Expect target name after control message operator');
+    const params = this.paramList();
+
+    return {
+      kind: AstNodeKind.CONTROL_MESSAGE,
+      token,
+      target,
+      params,
+    };
   }
 
   private flag(): Flag {

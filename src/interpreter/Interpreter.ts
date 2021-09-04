@@ -1,7 +1,7 @@
 import {
   Assign,
   AstNodeKind,
-  Binary,
+  Binary, Control,
   Expr,
   Flag,
   InnerSequence,
@@ -29,6 +29,7 @@ export enum InstructionKind {
   SequenceRef = 'SequenceRef',
   SequenceOperation = 'SequenceOperation',
   SequenceDeclaration = 'SequenceDeclaration',
+  ControlMessage = 'ControlMessage',
 }
 
 export interface Message {
@@ -54,6 +55,7 @@ export interface Step {
   flag?: FlagMessage;
   jump?: JumpMessage;
   innerSequence?: InnerSequenceMessage;
+  controlMessage?: ControlMessage;
 }
 
 export interface InnerSequenceMessage {
@@ -68,8 +70,14 @@ export interface SequenceRef {
 }
 
 export interface SequenceDeclaration {
-  kind: InstructionKind.SequenceDeclaration,
+  kind: InstructionKind.SequenceDeclaration;
   steps: Step[];
+}
+
+export interface ControlMessage {
+  kind: InstructionKind.ControlMessage;
+  params: { [paramName: string]: any };
+  target: string;
 }
 
 export type SequenceOperationKind = 'left' | 'all' | 'any';
@@ -340,7 +348,9 @@ export class Interpreter {
     return {
       kind: InstructionKind.SequenceDeclaration,
       steps: sequence.expressions.map(channelsOrFlagOrJump => {
-        if (channelsOrFlagOrJump.kind === AstNodeKind.FLAG) {
+        if (channelsOrFlagOrJump.kind === AstNodeKind.CONTROL_MESSAGE) {
+          return this.processControlMessage(channelsOrFlagOrJump, topLevelExpressions);
+        } else if (channelsOrFlagOrJump.kind === AstNodeKind.FLAG) {
           return this.processFlagStep(channelsOrFlagOrJump);
         } else if (channelsOrFlagOrJump.kind === AstNodeKind.JUMP) {
           return this.processJumpStep(channelsOrFlagOrJump);
@@ -351,6 +361,18 @@ export class Interpreter {
         }
       })
     };
+  }
+
+  private static processControlMessage(control: Control, topLevelExpressions: Expr[]): Step {
+    const params = {};
+    control.params.forEach(param => {
+      if (param.kind === AstNodeKind.PARAM) {
+        params[param.assignee.lexeme] = this.evaluate(param?.value, topLevelExpressions);
+      }
+    });
+
+    const controlMessage: ControlMessage = ({kind: InstructionKind.ControlMessage, target: control.target.lexeme, params});
+    return {kind: InstructionKind.Step, controlMessage};
   }
 }
 

@@ -1,5 +1,5 @@
 import {
-  Assignable,
+  Assignable, ControlMessage,
   InstructionKind,
   Interpreter,
   MessageSequence,
@@ -22,6 +22,20 @@ export class MidiPlayer {
   private _scheduler: Scheduler = new Scheduler();
   private playHead: PlayHead;
   private latestInterpretedCode: string;
+  private _speed: number = 1;
+
+  set speed(speed: number) {
+    if (! isNaN(speed) && speed > 0) {
+      this._speed = speed;
+    } else {
+      // TODO use error reporter?
+      console.error('Wrong speed value ' + speed);
+    }
+  }
+
+  get speed(): number {
+    return this._speed;
+  }
 
   public get scheduler(): Scheduler {
     return this._scheduler;
@@ -54,7 +68,7 @@ export class MidiPlayer {
     this.reinterpretCode();
 
     if (this.latestInterpretedCode) {
-      this.playHead = PlayHead.createAtRoot(this, 'Root', {onEnded, onStepPlay}, 0);
+      this.playHead = PlayHead.createAtRoot(this, 'Root', {onEnded, onStepPlay}, 0.25, 0);
       this._scheduler.start();
     } else {
       onEnded();
@@ -87,12 +101,25 @@ class PlayHead {
   private readonly tracks: Map<number, Track> = new Map();
   private stepPositionInSequence = 0;
   private timeStep = 0;
-
-  private stepDuration = 0.27;
+  private _stepDuration: number;
 
   private sequenceStack: { name: string, steps: Step[] }[] = [];
 
-  constructor(public readonly player: MidiPlayer, public nextStepTime: number = 0) {
+  public set stepDuration(stepDuration: number) {
+    if (! isNaN(stepDuration) && stepDuration > 0) {
+      this._stepDuration = stepDuration;
+    } else {
+      // TODO use error reporter?
+      console.error('Wrong step duration value ' + stepDuration);
+    }
+  }
+
+  public get stepDuration(): number {
+    return this._stepDuration;
+  }
+
+  constructor(public readonly player: MidiPlayer, stepDuration: number, public nextStepTime: number = 0) {
+    this.stepDuration = stepDuration;
   }
 
   public get stepsBySequenceName(): MessageSequence {
@@ -107,14 +134,14 @@ class PlayHead {
     return this.sequenceStack[this.sequenceStack.length - 1]?.steps ?? [];
   }
 
-  static createAtRoot(player: MidiPlayer, sequenceName: string, stepArguments: StepArguments, timePos: number): PlayHead {
-    const playHead = new PlayHead(player, timePos);
+  static createAtRoot(player: MidiPlayer, sequenceName: string, stepArguments: StepArguments, stepDuration: number, timePos: number): PlayHead {
+    const playHead = new PlayHead(player, stepDuration, timePos);
     playHead.readRootSequence(sequenceName, stepArguments);
     return playHead;
   }
 
-  static createForSequence(player: MidiPlayer, sequence: SequenceDeclaration | SequenceOperation | string, stepArguments: StepArguments, timePos: number, sequenceName: string): PlayHead {
-    const playHead = new PlayHead(player, timePos);
+  static createForSequence(player: MidiPlayer, sequence: SequenceDeclaration | SequenceOperation | string, stepArguments: StepArguments, stepDuration: number, timePos: number, sequenceName: string): PlayHead {
+    const playHead = new PlayHead(player, stepDuration, timePos);
     playHead.readSequenceOrOperation(sequence, stepArguments, sequenceName);
     return playHead;
   }
@@ -180,6 +207,7 @@ class PlayHead {
             }
           },
         },
+        this.stepDuration,
         this.nextStepTime,
         name);
 
@@ -194,6 +222,7 @@ class PlayHead {
             }
           },
         },
+        this.stepDuration,
         this.nextStepTime,
         name);
   }
@@ -213,6 +242,7 @@ class PlayHead {
             }
           },
         },
+        this.stepDuration,
         this.nextStepTime,
         name);
 
@@ -227,6 +257,7 @@ class PlayHead {
             }
           },
         },
+        this.stepDuration,
         this.nextStepTime,
         name);
   }
@@ -257,6 +288,10 @@ class PlayHead {
         return this.innerSequence(step, stepArguments);
       }
 
+      if (step.controlMessage != null) {
+        return this.controlMessage(step.controlMessage, stepArguments);
+      }
+
       this.messages(step, stepArguments);
     }
   }
@@ -282,7 +317,7 @@ class PlayHead {
   }
 
   private scheduleAdvance(stepArguments: StepArguments): void {
-    this.nextStepTime += this.stepDuration;
+    this.nextStepTime += this.stepDuration / this.player.speed;
     this.scheduler.schedule(this.nextStepTime, () => this.advance(stepArguments));
   }
 
@@ -353,7 +388,7 @@ class PlayHead {
     let noteOnCounter = 0;
 
     step.messages.forEach(message => {
-      let {p, v, i} = message.params;
+      let {p, v, i, c} = message.params;
       let track = this.tracks.get(i);
 
       if (track == null) {
@@ -364,7 +399,7 @@ class PlayHead {
       if (message.silent) {
         track.silence();
       } else if (!isNaN(p) && p >= 0 && p < 128) {
-        track.noteOn(p, v);
+        track.noteOn(p, v, c);
         noteOnCounter++;
       } else if (v != null) {
         track.velocityChange(v);
@@ -385,27 +420,51 @@ class PlayHead {
   private popSequence(): void {
     this.sequenceStack.pop();
   }
+
+  private controlMessage(controlMessage: ControlMessage, stepArguments: StepArguments) {
+    if (controlMessage.target === 'head') {
+      Object.entries(controlMessage.params).forEach(entry => {
+        if (entry[0] === 'stepDuration') {
+          this.stepDuration = entry[1];
+        }
+      });
+    } else if (controlMessage.target === 'player') {
+      Object.entries(controlMessage.params).forEach(entry => {
+        if (entry[0] === 'speed') {
+          this.player.speed = +entry[1];
+        }
+      })
+    }
+
+    this.advance(stepArguments);
+  }
 }
 
 class Track {
-  private latestVelocity = 0;
-  private _latestPitch: number;
+  private _latestVelocity = 0;
+  private _pendingPitch: number;
+  private _pendingChannel: number;
+  private _latestChannel: number;
 
   constructor(public readonly output: MidiOutput) {
   }
 
-  noteOn(pitch: number, velocity?: number) {
+  noteOn(pitch: number, velocity?: number, channel?: number) {
     this.endPendingNote();
 
     if (velocity != null) {
       velocity = Math.min(Math.max(0, velocity), 127);
-      this.latestVelocity = velocity;
+      this._latestVelocity = velocity;
     } else {
-      velocity = this.latestVelocity;
+      velocity = this._latestVelocity;
     }
 
-    this.output.noteOn(pitch, velocity);
-    this._latestPitch = pitch;
+    channel = channel ?? this._latestChannel ?? 0;
+
+    this.output.noteOn(pitch, velocity, channel);
+    this._pendingPitch = pitch;
+    this._pendingChannel = channel;
+    this._latestChannel = channel;
   }
 
   silence() {
@@ -415,14 +474,15 @@ class Track {
   velocityChange(velocity: number) {
     if (!isNaN(velocity)) {
       velocity = Math.min(Math.max(0, velocity), 127);
-      this.latestVelocity = velocity;
+      this._latestVelocity = velocity;
     }
   }
 
   private endPendingNote(): void {
-    if (this._latestPitch != null) {
-      this.output.noteOff(this._latestPitch);
-      this._latestPitch = null;
+    if (this._pendingPitch != null) {
+      this.output.noteOff(this._pendingPitch, 0, this._pendingChannel);
+      this._pendingPitch = null;
+      this._pendingChannel = null;
     }
   }
 }

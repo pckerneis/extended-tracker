@@ -5,6 +5,8 @@ A = [ - ; p:72, v: 50 ; - ; - ; - ; - ; - ; - ; ]
 C = [ - ; - ; p: 70, v:50 ; ]
 
 Root = [
+$ player speed: 118 / 60
+$ head stepDuration: 1/8
 # start
 {B || A || C}
 p:80, v: 50
@@ -12,12 +14,14 @@ p:80, v: 50
 |
 |
 |
+$ head stepDuration: 1/6
 {A || B || C}
 p:80, v: 50
 |
 |
 |
 |
+$ head stepDuration: 1/4
 {C || A || B}
 p:80, v: 50
 |

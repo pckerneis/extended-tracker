@@ -1,4 +1,3 @@
-
 ChordsA = [
     p: 48, v: 64
     | p: 55, v: 60
@@ -17,9 +16,6 @@ ChordsA = [
 Chords = [
     {ChordsA}
     {ChordsA}
-
-
-
     p: 47, v: 64
     | p: 62, v: 60
     | | p: 69, v: 60
@@ -48,61 +44,91 @@ Chords = [
 
 melodyVel = 65
 
+MelodyA = [
+    p: 71, v: melodyVel, c: 2
+    ,
+    ,
+    ,
+    p: 74
+    ,
+    p: 69
+    ,
+    ,
+    ,
+    p: 67
+    p: 69
+    p: 71
+    ,
+    ,
+    ,
+    p: 74
+    ,
+    p: 69
+    ,
+    ,
+    ,
+    -
+    -
+]
+
+MelodyB = [
+    p: 71
+    ,
+    ,
+    ,
+    p: 74
+    ,
+    p: 81
+    ,
+    ,
+    ,
+    p: 79
+    ,
+]
+
+MelodyC1 = [
+    p: 74
+    ,
+    ,
+    ,
+    p: 72
+    p: 71
+    p: 69
+    ,
+    ,
+    ,
+    -
+    -
+]
+
+MelodyC2 = [
+    p: 86
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    ,
+    -
+    -
+]
+
 Melody = [
-p: 70, v: melodyVel
-,
-,
-,
-p: 74
-,
-p: 69
-,
-,
-,
-p: 67
-p: 69
-p: 71
-,
-,
-,
-p: 74
-,
-p: 69
-,
-,
-,
--
--
-
-
-p: 71
-,
-,
-,
-p: 74
-,
-p: 81
-,
-,
-,
-p: 79
--
-p: 74
-,
-,
-,
-p: 72
-p: 71
-p: 69
-,
-,
-,
--
--
+    {MelodyA}
+    {MelodyB}
+    {MelodyC1}
+    {MelodyA}
+    {MelodyB}
+    {MelodyC2}
 ]
 
 Root = [
     # start
-    {Chords || Melody}
+    $ player speed: 110 / 60
+    $ head stepDuration: 1/2
+    {[{Chords} ; {Chords}] & Melody}
     @ start
 ]
