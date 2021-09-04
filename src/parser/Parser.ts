@@ -1,5 +1,5 @@
 import {Token, TokenType} from '../scanner/tokens';
-import {Expr, Kind} from './Ast';
+import {Expr, Flag, Jump, AstNodeKind, SequenceFlagRef} from './Ast';
 
 export class Parser {
   private current: number = 0;
@@ -65,7 +65,7 @@ export class Parser {
         const name = expr.name;
 
         return {
-          kind: Kind.ASSIGN,
+          kind: AstNodeKind.ASSIGN,
           assignee: name,
           equals,
           value,
@@ -76,6 +76,11 @@ export class Parser {
     }
 
     return expr;
+  }
+
+  private expression(): Expr {
+    this.consumeNewLines();
+    return this.ternary(); // TODO Check precedence
   }
 
   private sequence(): (Expr | null)[] {
@@ -103,57 +108,9 @@ export class Parser {
       }
 
       if (this.match(this.jumpToken)) {
-        const jumpToken = this.previous();
-
-        if (this.match(TokenType.IDENTIFIER)) {
-          const sequenceOrFlagName = this.previous()
-
-          if (this.match(this.flagToken)) {
-            const flagToken = this.previous();
-
-            if (this.match(TokenType.IDENTIFIER)) {
-              const outerFlagName = this.previous();
-
-              expressions.push({
-                kind: Kind.JUMP,
-                jumpToken,
-                sequence: sequenceOrFlagName,
-                flag: outerFlagName,
-                flagToken,
-              });
-            } else {
-              expressions.push({
-                kind: Kind.JUMP,
-                jumpToken,
-                sequence: sequenceOrFlagName,
-                flag: null,
-                flagToken,
-              });
-            }
-          } else {
-            expressions.push({
-              kind: Kind.JUMP,
-              jumpToken,
-              sequence: null,
-              flag: sequenceOrFlagName,
-              flagToken: null,
-            });
-          }
-        } else {
-          throw new Error('Expected flag name after ' + this.jumpToken);
-        }
+        expressions.push(this.jump());
       } else if (this.match(this.flagToken)) {
-        const flagToken = this.previous();
-
-        if (this.match(TokenType.IDENTIFIER)) {
-          expressions.push({
-            kind: Kind.FLAG,
-            flagToken,
-            name: this.previous(),
-          });
-        } else {
-          throw new Error('Expected flag name after ' + this.flagToken);
-        }
+        expressions.push(this.flag());
       } else if (this.match(this.innerSequenceStartToken)) {
         if (!this.check(this.innerSequenceEndToken)) {
           expressions.push(this.innerSequence());
@@ -162,7 +119,7 @@ export class Parser {
         const trackList = this.trackList();
 
         expressions.push({
-          kind: Kind.TRACKS,
+          kind: AstNodeKind.TRACKS,
           tracks: trackList,
         });
       }
@@ -183,7 +140,7 @@ export class Parser {
 
       if (this.check(this.trackSeparator)) {
         tracks.push({
-          kind: Kind.PARAMS,
+          kind: AstNodeKind.PARAMS,
           params : [],
         });
 
@@ -195,7 +152,7 @@ export class Parser {
       params.push(...this.paramList());
 
       tracks.push({
-        kind: Kind.PARAMS,
+        kind: AstNodeKind.PARAMS,
         params,
       });
     } while (this.match(this.trackSeparator));
@@ -212,7 +169,7 @@ export class Parser {
       }
 
       if (this.match(this.paramSeparator)) {
-        expressions.push({ kind: Kind.EMPTY_PARAM });
+        expressions.push({ kind: AstNodeKind.EMPTY_PARAM });
 
         while (this.check(this.paramSeparator)) {
           this.advance();
@@ -241,14 +198,14 @@ export class Parser {
         const value = this.expression();
 
         return {
-          kind: Kind.PARAM,
+          kind: AstNodeKind.PARAM,
           assignee: name,
           colon,
           value,
         };
       } else if ([this.paramSeparator, this.trackSeparator, ...this.stepSeparators].includes(this.peek().type)) {
         return {
-          kind: Kind.PARAM,
+          kind: AstNodeKind.PARAM,
           assignee: name,
           colon: null,
           value: null,
@@ -261,46 +218,15 @@ export class Parser {
 
   private innerSequence(): Expr {
     const startToken = this.previous();
-    const sequenceName = this.consume([TokenType.IDENTIFIER], 'Expect a inner sequence name.');
-    let flagToken: Token;
-    let flagName: Token;
-
-    if (this.match(this.flagToken)) {
-      flagToken = this.previous();
-      flagName = this.consume([TokenType.IDENTIFIER], 'Expect a flag name.');
-    }
-
-    this.consume([this.innerSequenceEndToken], `Expect ${TokenType.RIGHT_BRACKET} after a inner sequence`);
+    const maybeSequence = this.expression();
+    this.consume([this.innerSequenceEndToken], `Expect ${this.innerSequenceEndToken} after a inner sequence`);
     const endToken = this.previous();
 
     return {
-      kind: Kind.INNER_SEQUENCE,
-      sequenceName,
-      flagName,
-      flagToken,
+      kind: AstNodeKind.INNER_SEQUENCE,
       startToken, endToken,
+      maybeSequence,
     };
-  }
-
-  private expression(): Expr {
-    this.consumeNewLines();
-
-    if (this.match(this.sequenceStartToken)) {
-      const startToken = this.previous();
-      this.consumeNewLines();
-      const sequence = this.sequence();
-      const endToken = this.previous();
-
-      this.consumeNewLines();
-
-      return {
-        kind: Kind.SEQUENCE,
-        expressions: sequence,
-        startToken, endToken,
-      }
-    }
-
-    return this.ternary();
   }
 
   private ternary(): Expr {
@@ -315,7 +241,7 @@ export class Parser {
       const elseBranch = this.expression();
 
       return {
-        kind: Kind.TERNARY_COND,
+        kind: AstNodeKind.TERNARY_COND,
         condition: expr,
         ifBranch, elseBranch,
         operators: [condOp, elseOp],
@@ -325,13 +251,31 @@ export class Parser {
     return expr;
   }
 
+  // private sequenceBinary(): Expr {
+  //   let expr = this.or();
+  //
+  //   while (this.match(TokenType.PIPE, TokenType.AMPERSAND, TokenType.PLUS)) {
+  //     const operator = this.previous();
+  //     const right = this.expression();
+  //
+  //     expr = {
+  //       kind: Kind.BINARY,
+  //       left: expr,
+  //       right,
+  //       operator,
+  //     };
+  //   }
+  //
+  //   return expr;
+  // }
+
   private or(): Expr {
     let expr = this.and();
 
     while (this.match(TokenType.DOUBLE_PIPE)) {
       const operator: Token = this.previous();
       const right: Expr = this.and();
-      expr = {kind: Kind.LOGICAL, left: expr, operator, right};
+      expr = {kind: AstNodeKind.LOGICAL, left: expr, operator, right};
     }
 
     return expr;
@@ -343,7 +287,7 @@ export class Parser {
     while (this.match(TokenType.AMPERSAND)) {
       const operator: Token = this.previous();
       const right: Expr = this.equality();
-      expr = {kind: Kind.LOGICAL, left: expr, operator, right};
+      expr = {kind: AstNodeKind.LOGICAL, left: expr, operator, right};
     }
 
     return expr;
@@ -355,7 +299,7 @@ export class Parser {
     while (this.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
       const operator: Token = this.previous();
       const right: Expr = this.comparison();
-      expr = {kind: Kind.BINARY, left: expr, operator, right};
+      expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -367,7 +311,7 @@ export class Parser {
     while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
       const operator: Token = this.previous();
       const right: Expr = this.addition();
-      expr = {kind: Kind.BINARY, left: expr, operator, right};
+      expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -379,7 +323,7 @@ export class Parser {
     while (this.match(TokenType.MINUS, TokenType.PLUS)) {
       const operator: Token = this.previous();
       const right: Expr = this.multiplication();
-      left = {kind: Kind.BINARY, left, operator, right};
+      left = {kind: AstNodeKind.BINARY, left, operator, right};
     }
 
     return left;
@@ -391,7 +335,7 @@ export class Parser {
     while (this.match(TokenType.SLASH, TokenType.STAR)) {
       const operator: Token = this.previous();
       const right: Expr = this.unary();
-      expr = {kind: Kind.BINARY, left: expr, operator, right};
+      expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};
     }
 
     return expr;
@@ -401,7 +345,7 @@ export class Parser {
     if (this.match(TokenType.BANG, TokenType.MINUS)) {
       const operator: Token = this.previous();
       const right: Expr = this.unary();
-      return {kind: Kind.RL_UNARY, operator, right};
+      return {kind: AstNodeKind.RL_UNARY, operator, right};
     }
 
     return this.primary();
@@ -409,16 +353,35 @@ export class Parser {
 
   private primary(): Expr {
     if (this.match(TokenType.NUMBER, TokenType.STRING))
-      return {kind: Kind.LITERAL, value: this.previous().literal, token: this.previous()};
+      return {kind: AstNodeKind.LITERAL, value: this.previous().literal, token: this.previous()};
 
     if (this.match(TokenType.LEFT_PAREN)) {
       const expr: Expr = this.expression();
       this.consume([TokenType.RIGHT_PAREN], 'Expect \')\' after expression');
-      return {kind: Kind.GROUPING, expr};
+      return {kind: AstNodeKind.GROUPING, expr};
     }
 
     if (this.match(TokenType.IDENTIFIER, this.silenceToken)) {
-      return {kind: Kind.VARIABLE, name: this.previous()};
+      if (this.peek().type === TokenType.DASH) {
+        return this.innerSequenceName();
+      }
+
+      return {kind: AstNodeKind.VARIABLE, name: this.previous()};
+    }
+
+    if (this.match(this.sequenceStartToken)) {
+      const startToken = this.previous();
+      this.consumeNewLines();
+      const sequence = this.sequence();
+      const endToken = this.previous();
+
+      this.consumeNewLines();
+
+      return {
+        kind: AstNodeKind.SEQUENCE,
+        expressions: sequence,
+        startToken, endToken,
+      };
     }
 
     const peek = this.peek();
@@ -467,6 +430,80 @@ export class Parser {
   private consumeNewLines(): void {
     while (this.check(TokenType.NEW_LINE))
       this.advance();
+  }
+
+  private jump(): Jump {
+    const jumpToken = this.previous();
+
+    if (this.match(TokenType.IDENTIFIER)) {
+      const sequenceOrFlagName = this.previous()
+
+      if (this.match(this.flagToken)) {
+        const flagToken = this.previous();
+
+        if (this.match(TokenType.IDENTIFIER)) {
+          const outerFlagName = this.previous();
+
+          return {
+            kind: AstNodeKind.JUMP,
+            jumpToken,
+            sequence: sequenceOrFlagName,
+            flag: outerFlagName,
+            flagToken,
+          };
+        } else {
+          return {
+            kind: AstNodeKind.JUMP,
+            jumpToken,
+            sequence: sequenceOrFlagName,
+            flag: null,
+            flagToken,
+          };
+        }
+      } else {
+        return {
+          kind: AstNodeKind.JUMP,
+          jumpToken,
+          sequence: null,
+          flag: sequenceOrFlagName,
+          flagToken: null,
+        };
+      }
+    } else {
+      throw new Error('Expected flag name after ' + this.jumpToken);
+    }
+  }
+
+  private flag(): Flag {
+    const flagToken = this.previous();
+
+    if (this.match(TokenType.IDENTIFIER)) {
+      return {
+        kind: AstNodeKind.FLAG,
+        flagToken,
+        name: this.previous(),
+      };
+    } else {
+      throw new Error('Expected flag name after ' + this.flagToken);
+    }
+  }
+
+  private innerSequenceName(): SequenceFlagRef {
+    const sequenceName = this.previous();
+    let flagToken: Token;
+    let flagName: Token;
+
+    if (this.match(this.flagToken)) {
+      flagToken = this.previous();
+      flagName = this.consume([TokenType.IDENTIFIER], 'Expect a flag name.');
+    }
+
+    return {
+      kind: AstNodeKind.SEQUENCE_FLAG_REF,
+      sequenceName,
+      flagName,
+      flagToken,
+    };
   }
 }
 

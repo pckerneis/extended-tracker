@@ -1,8 +1,9 @@
 import {Token} from '../scanner/tokens';
 
-export enum Kind {
+export enum AstNodeKind {
   SEQUENCE = 'SEQUENCE',
   INNER_SEQUENCE = 'INNER_SEQUENCE',
+  SEQUENCE_FLAG_REF = 'SEQUENCE_FLAG_REF',
   TRACKS = 'TRACKS',
   VARIABLE = 'VARIABLE',
   ASSIGN = 'ASSIGN',
@@ -22,92 +23,97 @@ export enum Kind {
 }
 
 export interface Sequence {
-  readonly kind: Kind.SEQUENCE;
+  readonly kind: AstNodeKind.SEQUENCE;
   readonly expressions: (Expr | null)[];
   readonly startToken: Token;
   readonly endToken: Token;
 }
 
 export interface InnerSequence {
-  readonly kind: Kind.INNER_SEQUENCE;
-  readonly sequenceName: Token;
+  readonly kind: AstNodeKind.INNER_SEQUENCE;
   readonly startToken: Token;
   readonly endToken: Token;
+  readonly maybeSequence?: Expr;
+}
+
+export interface SequenceFlagRef {
+  readonly kind: AstNodeKind.SEQUENCE_FLAG_REF;
+  readonly sequenceName?: Token;
   readonly flagToken?: Token;
   readonly flagName?: Token;
 }
 
 export interface TrackList {
-  readonly kind: Kind.TRACKS;
+  readonly kind: AstNodeKind.TRACKS;
   readonly tracks: Expr[];
 }
 
 export interface Variable {
-  readonly kind: Kind.VARIABLE;
+  readonly kind: AstNodeKind.VARIABLE;
   readonly name: Token;
 }
 
 export interface Assign {
-  readonly kind: Kind.ASSIGN;
+  readonly kind: AstNodeKind.ASSIGN;
   readonly value: Expr;
   readonly assignee: Token;
   readonly equals: Token;
 }
 
 export interface Silence {
-  readonly kind: Kind.SILENCE;
+  readonly kind: AstNodeKind.SILENCE;
   readonly token: Token;
 }
 
 export interface Param {
-  readonly kind: Kind.PARAM;
+  readonly kind: AstNodeKind.PARAM;
   readonly value: Expr;
   readonly assignee: Token;
   readonly colon: Token;
 }
 
 export interface EmptyParam {
-  readonly kind: Kind.EMPTY_PARAM;
+  readonly kind: AstNodeKind.EMPTY_PARAM;
 }
 
 export interface ParamList {
-  readonly kind: Kind.PARAMS;
+  readonly kind: AstNodeKind.PARAMS;
   readonly params: Expr[];
 }
 
 export interface Logical {
-  readonly kind: Kind.LOGICAL;
+  readonly kind: AstNodeKind.LOGICAL;
   readonly left: Expr;
   readonly right: Expr;
   readonly operator: Token;
 }
 
 export interface RLUnary {
-  readonly kind: Kind.RL_UNARY;
+  readonly kind: AstNodeKind.RL_UNARY;
   readonly right: Expr;
   readonly operator: Token;
 }
 
 export interface Binary {
-  readonly kind: Kind.BINARY;
+  readonly kind: AstNodeKind.BINARY;
   readonly left: Expr;
   readonly operator: Token;
   readonly right: Expr;
 }
 
 export interface Literal {
-  readonly kind: Kind.LITERAL;
+  readonly kind: AstNodeKind.LITERAL;
   readonly value: any;
   readonly token: Token;
 }
 
 export interface Grouping {
-  readonly kind: Kind.GROUPING;
+  readonly kind: AstNodeKind.GROUPING;
   readonly expr: Expr;
 }
 
 export interface TernaryCondition {
-  readonly kind: Kind.TERNARY_COND;
+  readonly kind: AstNodeKind.TERNARY_COND;
   readonly condition: Expr;
   readonly ifBranch: Expr;
   readonly elseBranch: Expr;
@@ -115,20 +121,20 @@ export interface TernaryCondition {
 }
 
 export interface Call {
-  readonly kind: Kind.CALL;
+  readonly kind: AstNodeKind.CALL;
   readonly callee: Expr;
   readonly parenTokens: Token[];
   readonly args: Expr[];
 }
 
 export interface Flag {
-  readonly kind: Kind.FLAG;
+  readonly kind: AstNodeKind.FLAG;
   readonly flagToken: Token;
   readonly name: Token;
 }
 
 export interface Jump {
-  readonly kind: Kind.JUMP;
+  readonly kind: AstNodeKind.JUMP;
   readonly jumpToken: Token;
   readonly flag: Token;
   readonly sequence: Token;
@@ -143,6 +149,7 @@ export type Expr =
   | Flag
   | Grouping
   | InnerSequence
+  | SequenceFlagRef
   | Jump
   | Literal
   | Logical

@@ -1,28 +1,34 @@
-import {CodeProvider, Interpreter, MessageSequence, Step} from '../interpreter/Interpreter';
+import {
+  Assignable,
+  InstructionKind,
+  Interpreter,
+  MessageSequence,
+  SequenceDeclaration,
+  SequenceLike,
+  SequenceOperation,
+  Step
+} from '../interpreter/Interpreter';
 import {MidiOutput} from '../midi/MidiOutput';
 import {ErrorReporter} from '../error/ErrorReporter';
 import {Scheduler} from "../scheduler/Scheduler";
 
+
+export interface CodeProvider {
+  code: string;
+}
+
 export class MidiPlayer {
-  private readonly tracks: Map<number, Track> = new Map();
-  private currentSequenceName: string;
-  private stepPositionInSequence = 0;
-  private stepsBySequenceName: MessageSequence;
-  private timeStep = 0;
 
-  private nextStepTime = 0;
+  private _scheduler: Scheduler = new Scheduler();
+  private playHead: PlayHead;
 
-  private sequenceStack: string[] = [];
-
-  private scheduler: Scheduler = new Scheduler();
-
-  public get currentSequence(): Step[] {
-    return this.stepsBySequenceName[this.currentSequenceName] || [];
+  public get scheduler(): Scheduler {
+    return this._scheduler;
   }
 
-  private constructor(private readonly codeProvider: CodeProvider,
-                      private readonly output: MidiOutput,
-                      private readonly errorReporter: ErrorReporter) {
+  private constructor(public readonly codeProvider: CodeProvider,
+                      public readonly output: MidiOutput,
+                      public readonly errorReporter: ErrorReporter) {
   }
 
   public static play(codeProvider: CodeProvider,
@@ -40,20 +46,88 @@ export class MidiPlayer {
   }
 
   private doPlay(onEnded: Function, onStepPlay: StepPlayCallback): void {
-    this.reinterpretCode();
+    this.playHead = PlayHead.createAtRoot(this, 'Program', {onEnded, onStepPlay});
+    this._scheduler.start();
+  }
+}
 
-    if (this.stepsBySequenceName == null) {
-      onEnded();
-      return;
+function isPrimitive(thing: any) {
+  return ['number', 'boolean', 'string'].includes(typeof thing);
+}
+
+class PlayHead {
+
+  private readonly tracks: Map<number, Track> = new Map();
+  private currentSequenceName: string;
+  private stepPositionInSequence = 0;
+  private stepsBySequenceName: MessageSequence;
+  private timeStep = 0;
+
+  private stepDuration = 0.27;
+
+  private sequenceStack: { index: number, steps: Step[] }[] = [];
+
+  private readonly childrenPlayHeads: PlayHead[] = [];
+
+  constructor(public readonly player: MidiPlayer, public nextStepTime: number = 0) {
+  }
+
+  public get scheduler(): Scheduler {
+    return this.player.scheduler;
+  }
+
+  public get currentSequence(): Step[] {
+    return this.sequenceStack[this.sequenceStack.length - 1]?.steps ?? [];
+  }
+
+  static createAtRoot(player: MidiPlayer, sequenceName: string, stepArguments: StepArguments): PlayHead {
+    const playHead = new PlayHead(player);
+    playHead.readRootSequence(sequenceName, stepArguments);
+    return playHead;
+  }
+
+  static createForSequence(player: MidiPlayer, sequence: SequenceDeclaration | SequenceOperation | string, stepArguments: StepArguments, timePos: number): PlayHead {
+    const playHead = new PlayHead(player, timePos);
+    playHead.reinterpretCode();
+    playHead.pushSequence(playHead.readSequenceOrOperation(sequence, stepArguments), 0);
+    playHead.nextStep(stepArguments);
+    return playHead;
+  }
+
+  private readRootSequence(sequenceName: string, stepArguments: StepArguments): void {
+    this.reinterpretCode();
+    let instruction = this.stepsBySequenceName[sequenceName];
+
+    if (instruction == null) {
+      throw new Error('Could not find root declaration with name ' + sequenceName);
     }
 
-    this.timeStep = 0;
-    this.currentSequenceName = 'Program';
-    this.stepPositionInSequence = 0;
+    this.pushSequence(this.readSequenceOrOperation(instruction, stepArguments), 0);
+    this.currentSequenceName = sequenceName;
 
-    this.nextStep({onStepPlay, onEnded});
+    this.nextStep(stepArguments);
+  }
 
-    this.scheduler.start();
+  private readSequenceOrOperation(maybeSequence: Assignable, stepArguments: StepArguments): Step[] {
+    while (maybeSequence && typeof maybeSequence === 'object' && maybeSequence?.kind === InstructionKind.SequenceOperation) {
+      const operation = maybeSequence as SequenceOperation;
+      maybeSequence = operation.left;
+      // TODO never released
+      this.childrenPlayHeads.push(PlayHead.createForSequence(this.player, operation.right, {
+            ...stepArguments,
+            onEnded: () => {
+              // TODO
+            },
+          },
+          this.nextStepTime));
+    }
+
+    if (typeof maybeSequence === 'object' && maybeSequence.kind === InstructionKind.SequenceDeclaration) {
+      return maybeSequence.steps;
+    }
+
+    console.log('bbouu')
+    return [];
   }
 
   private advance(stepArguments: StepArguments) {
@@ -96,7 +170,7 @@ export class MidiPlayer {
     stepArguments.onStepPlay({
       timeStep: this.timeStep,
       timePosition: this.nextStepTime,
-      sequenceStack: this.sequenceStack,
+      sequenceStack: [],
       sequenceName: this.currentSequenceName,
       stepNumber: this.stepPositionInSequence,
       noteOnCount: noteOnCounter,
@@ -108,38 +182,56 @@ export class MidiPlayer {
   }
 
   private scheduleAdvance(stepArguments: StepArguments): void {
-    this.nextStepTime += 0.5;
+    this.nextStepTime += this.stepDuration;
     this.scheduler.schedule(this.nextStepTime, () => this.advance(stepArguments));
   }
 
   private innerSequence(step: Step, stepArguments: StepArguments): void {
     this.reinterpretCode();
 
-    const { sequenceName, flagName } = step.innerSequence;
+    if (step.innerSequence.content.kind === InstructionKind.SequenceRef) {
 
-    if (this.stepsBySequenceName[sequenceName] != null) {
-      const previousPosition = this.stepPositionInSequence;
+      const {sequenceName, flagName} = step.innerSequence.content;
 
-      this.sequenceStack.push(this.currentSequenceName);
-      this.currentSequenceName = sequenceName;
+      if (this.stepsBySequenceName[sequenceName] != null && !isPrimitive(this.stepsBySequenceName[sequenceName])) {
+        const steps = this.readSequenceOrOperation(this.stepsBySequenceName[sequenceName] as SequenceLike, stepArguments);
 
-      if (flagName) {
-        this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
+        const previousPosition = this.stepPositionInSequence;
+        this.currentSequenceName = sequenceName;
+
+        if (flagName) {
+          this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
+        } else {
+          this.stepPositionInSequence = 0;
+        }
+
+        this.pushSequence(steps, this.stepPositionInSequence);
+
+        this.nextStep({
+          ...stepArguments,
+          onEnded: () => {
+            this.popSequence();
+            this.stepPositionInSequence = previousPosition + 1;
+            this.nextStep(stepArguments);
+          }
+        });
       } else {
-        this.stepPositionInSequence = 0;
+        this.advance(stepArguments);
       }
+    } else if (step.innerSequence.content.kind === InstructionKind.SequenceOperation) {
+      this.pushSequence(this.readSequenceOrOperation(step.innerSequence.content, stepArguments), 0);
+
+      const previousPosition = this.stepPositionInSequence;
+      this.stepPositionInSequence = 0;
 
       this.nextStep({
         ...stepArguments,
         onEnded: () => {
-          this.currentSequenceName = this.sequenceStack.pop();
           this.stepPositionInSequence = previousPosition + 1;
-
+          this.popSequence();
           this.nextStep(stepArguments);
         }
       });
-    } else {
-      this.advance(stepArguments);
     }
   }
 
@@ -179,7 +271,7 @@ export class MidiPlayer {
       let track = this.tracks.get(i);
 
       if (track == null) {
-        this.tracks.set(i, new Track(this.output));
+        this.tracks.set(i, new Track(this.player.output));
         track = this.tracks.get(i);
       }
 
@@ -197,11 +289,19 @@ export class MidiPlayer {
   }
 
   private reinterpretCode(): void {
-    const messageSequence = Interpreter.interpret(this.codeProvider.code, this.errorReporter);
+    const messageSequence = Interpreter.interpret(this.player.codeProvider.code, this.player.errorReporter);
 
     if (messageSequence != null) {
       this.stepsBySequenceName = messageSequence;
     }
+  }
+
+  private pushSequence(steps: Step[], index: number): void {
+    this.sequenceStack.push({steps, index});
+  }
+
+  private popSequence(): void {
+    this.sequenceStack.pop();
   }
 }
 
