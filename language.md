@@ -2,7 +2,7 @@
 
 ## Comments
 
-Comments allow increasing code readability but they have no impact on code.
+Comments allow increasing code readability, but they have no impact on code.
 
 ```
 // This is a comment
@@ -68,14 +68,14 @@ k = {p:36, v:80} // kick
 s = {p:38, v:80} // snare
 
 seq = [
-k
--
-k|s
--
-k
--
-k|s
--
+    k
+    -
+    k|s
+    -
+    k
+    -
+    k|s
+    -
 ]
 ```
 
@@ -103,16 +103,28 @@ k = {p:36, v:80} // kick
 s = {p:38, v:80} // snare
 
 seqA = [
-k
--
-k|s
--
+    k
+    -
+    k|s
+    -
 ]
 
 seqB = [ 
-{seqA}
-p: 12|p: 14
-{seqA} 
+    {seqA}
+    p: 12 | p: 14
+    {seqA} 
+]
+```
+
+### Parametrized sequences
+
+One can declare a sequence with an enumeration of parameters.
+
+```
+SeqA (pitch, velocity) = [ p: pitch, v: velocity ]
+
+Main = [
+    {SeqA(velocity: 50, pitch: 80)}
 ]
 ```
 
@@ -120,26 +132,26 @@ p: 12|p: 14
 
 ```
 seqA = [
-k
--
+    k
+    -
 ]
 
-Program = [
-{seqA}
-myCondition ? { seqA } : {
-    k|s
-    -
-}
+Main = [
+    {seqA}
+    myCondition ? { seqA } : { [
+        k|s
+        -
+    ] }
 ]
 ```
 
 Chaining
 
 ```
-Program = [
-{seqA}
-myCondition ? { seqA } : 
-mycondition2 ? { seqB } : {seqC }
+Main = [
+    {seqA}
+    myCondition ? { seqA } : 
+    mycondition2 ? { seqB } : {seqC }
 ```
 
 ## Tracks
@@ -150,18 +162,18 @@ The "|" operator allows separating tracks on a given step.
 main = [ p: 10 | p: 40 ]
 ```
 
-## "Program" variable
+## "Main" variable
 
-When playing a file, the player looks for a sequence stored in the "Program" variable.
+When playing a file, the player looks for a sequence stored in the "Main" variable.
 
 ```
-Program = [
-p: 36, v: 127       | p: 30, v: 80
--                   | ,
-p: 41               | -
--                   | p: 30
-p: 36               | ,
--                   | -
+Main = [
+    p: 36, v: 127       | p: 30, v: 80
+    -                   | ,
+    p: 41               | -
+    -                   | p: 30
+    p: 36               | ,
+    -                   | -
 ]
 ```
 
@@ -170,25 +182,25 @@ p: 36               | ,
 By default, the instruments used follow the track index, but we can use "i" param to change the mapping
 
 ```
-Program = [
-p: 43, i: 1
+Main = [
+    p: 43, i: 1
 ]
 ```
 
 ## Spaces and new lines
 
-Space/tab characters are non significant.
+Space/tab characters are not significant.
 
 Empty lines (no non-whitespace character once comments are stripped) are ignored. To make a sequence empty, put "-" or ",".
 
 ```
-Program = [
-p: 12
-
-p: 40 // comment in end of step
-
-, // this line is not empty
-// but this one is, once the comment is stripped
+Main = [
+    p: 12
+    
+    p: 40 // comment in end of step
+    
+    , // this line is not empty
+    // but this one is, once the comment is stripped
 ]
 ```
 
@@ -202,11 +214,11 @@ Jumps begin with the "@" operator followed by a flag name.
 
 ```
 loop = [
-# begin of loop
-p: 0
-p: 2
-p: 4
-@ begin of loop
+    # begin of loop
+    p: 0
+    p: 2
+    p: 4
+    @ begin of loop
 ]
 ```
 
@@ -216,14 +228,14 @@ It's possible to jump from a sequence to another by specifying a sequence name f
 specify a flag to jump to within the target sequence. 
 
 ```
-Sequence 1 = [
-p:1
-# flag A
-p:2
+Sequence1 = [
+    p:1
+    # flag A
+    p:2
 ]
 
-Program = [
-@ Sequence 1 # flag A
+Main = [
+    @ Sequence1 # flag A
 ]
 ```
 
@@ -233,11 +245,11 @@ Program = [
 finished = false
 
 loop = [
-# begin
-p: 0
-p: 2
-p: 4
-finished ? {} : {@ begin}
+    # begin
+    p: 0
+    p: 2
+    p: 4
+    finished ? {} : { [@ begin] }
 ]
 ```
 
@@ -250,7 +262,8 @@ as the player to control speed or other parameters.
 Control messages don't increment the time counter : the next step will play immediately after.
 
 ```
-$ Player tempo: 120, step: 0.25
+$ player speed: 120 / 60
+$ head stepDuration: 1 / 4
 ```
 
 # Program syntax
