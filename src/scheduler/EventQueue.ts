@@ -56,11 +56,9 @@ export class EventQueue<EventType> {
     private insertIndex(time: number, min: number, max: number): number {
         const range = max - min;
 
-        /*
         if (isNaN(range) || max < min) {
-          return undefined;
+          throw Error(`Illegal arguments for insertIndex : min=${min} and max=${max}`);
         }
-         */
 
         if (range === 0) {
             return min;

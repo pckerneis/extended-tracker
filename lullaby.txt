@@ -49,7 +49,7 @@ Chords = [
 melodyVel = 65
 
 Melody = [
-p: 71, v: melodyVel
+p: 70, v: melodyVel
 ,
 ,
 ,

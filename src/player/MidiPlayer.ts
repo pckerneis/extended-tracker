@@ -52,20 +52,28 @@ export class MidiPlayer {
   }
 
   private doPlay(onEnded: Function, onStepPlay: StepPlayCallback): void {
-    this.playHead = PlayHead.createAtRoot(this, 'Root', {onEnded, onStepPlay});
-    this._scheduler.start();
+    this.reinterpretCode();
+
+    if (this.latestInterpretedCode) {
+      this.playHead = PlayHead.createAtRoot(this, 'Root', {onEnded, onStepPlay});
+      this._scheduler.start();
+    } else {
+      onEnded();
+    }
   }
 
   public reinterpretCode(): void {
     const code = this.codeProvider.code;
 
     if (code !== this.latestInterpretedCode) {
-      this.latestInterpretedCode = code;
       const newProgram = Interpreter.interpret(this.codeProvider.code, this.errorReporter);
 
       if (newProgram != null) {
-        console.log('code reinterpreted')
+        console.log('Program interpreted')
         this._program = newProgram;
+        this.latestInterpretedCode = code;
+      } else {
+        console.error('Program could not be interpreted.');
       }
     }
   }
@@ -119,6 +127,7 @@ class PlayHead {
 
   private readRootSequence(sequenceName: string, stepArguments: StepArguments): void {
     this.reinterpretCode();
+
     let instruction = this.stepsBySequenceName[sequenceName];
 
     if (instruction == null) {

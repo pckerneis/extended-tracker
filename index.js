@@ -23,14 +23,14 @@ let wroteOnce = false;
 
 function onStepPlayed(stepInfo) {
   const pathMaxLength = 24;
-  const path = [...stepInfo.sequenceStack, stepInfo.sequenceName].join('/');
+  const path = stepInfo.sequenceStack.join('/');
   const truncated = path.length > pathMaxLength ? path.slice(path.length - pathMaxLength) : path;
   const fixedSize = truncated.padEnd(pathMaxLength, ' ');
-  const timeStep = stepInfo.timeStep;
+  const stepNumber = stepInfo.stepNumber;
   const messageBar = new Array(stepInfo.noteOnCount).fill('#').join('');
-  const t = timeStep + 1;
+  const t = stepInfo.timeStep + 1;
   const time = formatTime(stepInfo.timePosition);
-  const context = `${time} [${t}] ${fixedSize} [${timeStep}]`;
+  const context = `${time} [${t}] ${fixedSize} [${stepNumber}]`;
   const string = `${context} ${messageBar} `.padEnd(80);
 
   if (! wroteOnce) {
