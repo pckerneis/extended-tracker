@@ -195,6 +195,13 @@ export class Scanner {
     while (Scanner.isAlphaNumeric(this.peek())) {
       this.advance();
     }
+    const text = this.source.substring(this.start, this.current);
+
+    if (text === 'true') {
+      return this.addToken(TokenType.TRUE, this.column - (this.current - this.start), true);
+    } else if (text === 'false') {
+      return this.addToken(TokenType.FALSE, this.column - (this.current - this.start), false);
+    }
 
     this.addToken(TokenType.IDENTIFIER, this.column - (this.current - this.start));
   }

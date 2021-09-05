@@ -1,7 +1,8 @@
 import {
   Assign,
   AstNodeKind,
-  Binary, Control,
+  Binary,
+  Control,
   Expr,
   Flag,
   InnerSequence,
@@ -30,6 +31,7 @@ export enum InstructionKind {
   SequenceOperation = 'SequenceOperation',
   SequenceDeclaration = 'SequenceDeclaration',
   ControlMessage = 'ControlMessage',
+  TernaryInstruction = 'TernaryInstruction',
 }
 
 export interface Message {
@@ -60,13 +62,20 @@ export interface Step {
 
 export interface InnerSequenceMessage {
   kind: InstructionKind.InnerSequence;
-  content: SequenceRef | SequenceOperation | Sequence;
+  content: SequenceLike;
 }
 
 export interface SequenceRef {
   kind: InstructionKind.SequenceRef;
   sequenceName: string;
   flagName?: string;
+}
+
+export interface TernaryInstruction {
+  kind: InstructionKind.TernaryInstruction;
+  condition: boolean;
+  ifBranch: SequenceLike;
+  elseBranch: SequenceLike;
 }
 
 export interface SequenceDeclaration {
@@ -93,9 +102,9 @@ export interface MessageSequence {
   [sequenceName: string]: Assignable;
 }
 
-export type SequenceLike = SequenceDeclaration | SequenceOperation;
+export type SequenceLike = SequenceRef | SequenceDeclaration | SequenceOperation | TernaryInstruction;
 
-export type Assignable = SequenceDeclaration | SequenceOperation | number | string | boolean;
+export type Assignable = SequenceLike | number | string | boolean;
 
 function findSequenceOperation(operator: Token): SequenceOperationKind {
   switch(operator.lexeme) {
@@ -212,6 +221,19 @@ export class Interpreter {
           }
         }
       }
+    } else if (innerSequence.maybeSequence.kind === AstNodeKind.TERNARY_COND) {
+      return {
+        kind: InstructionKind.Step,
+        innerSequence: {
+          kind: InstructionKind.InnerSequence,
+          content: {
+            kind: InstructionKind.TernaryInstruction,
+            condition: this.evaluate(innerSequence.maybeSequence.condition, topLevelExpressions), // TODO lazy evaluation ?
+            ifBranch: this.evaluate(innerSequence.maybeSequence.ifBranch, topLevelExpressions),
+            elseBranch: this.evaluate(innerSequence.maybeSequence.elseBranch, topLevelExpressions),
+          }
+        }
+      }
     }
   }
 
@@ -323,7 +345,7 @@ export class Interpreter {
   }
 
   private static evaluateVariable(expr: Variable, topLevelExpressions: Expr[]): any {
-    return this.evaluate(this.findDeclaration(expr.name.lexeme, topLevelExpressions).value, topLevelExpressions);
+    return this.evaluate(this.findDeclaration(expr.name.lexeme, topLevelExpressions)?.value, topLevelExpressions);
   }
 
   private static asNumber(thing: any): number {
@@ -332,7 +354,7 @@ export class Interpreter {
     }
 
     if (typeof thing === 'boolean') {
-      return +thing;
+      return thing ? 1 : 0;
     } else if (typeof thing === 'number') {
       return thing;
     } else {

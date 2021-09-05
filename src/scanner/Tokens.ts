@@ -34,6 +34,8 @@ export enum TokenType {
   NEW_LINE        = 'NL',
   DASH            = '#',
   AT              = '@',
+  TRUE            = 'true',
+  FALSE           = 'false',
 }
 
 export const operators = '(){}[],.+-;/*%!=?<>|&$:"';

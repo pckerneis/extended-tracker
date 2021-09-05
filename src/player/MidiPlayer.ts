@@ -3,7 +3,7 @@ import {
   InstructionKind,
   Interpreter,
   MessageSequence,
-  SequenceDeclaration,
+  SequenceDeclaration, SequenceLike,
   SequenceOperation,
   Step
 } from '../interpreter/Interpreter';
@@ -145,7 +145,7 @@ class PlayHead {
     return playHead;
   }
 
-  static createForSequence(player: MidiPlayer, sequence: SequenceDeclaration | SequenceOperation | string, stepArguments: StepArguments, stepDuration: number, timePos: number, sequenceName: string): PlayHead {
+  static createForSequence(player: MidiPlayer, sequence: SequenceLike, stepArguments: StepArguments, stepDuration: number, timePos: number, sequenceName: string): PlayHead {
     const playHead = new PlayHead(player, stepDuration, timePos);
     playHead.readSequenceOrOperation(sequence, stepArguments, sequenceName);
     return playHead;

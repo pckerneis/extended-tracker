@@ -72,7 +72,7 @@ MelodyA = [
 ]
 
 MelodyB = [
-    p: 71
+    p: 71, v: melodyVel, c: 2
     ,
     ,
     ,
@@ -87,7 +87,7 @@ MelodyB = [
 ]
 
 MelodyC1 = [
-    p: 74
+    p: 74, v: melodyVel, c: 2
     ,
     ,
     ,
@@ -102,7 +102,7 @@ MelodyC1 = [
 ]
 
 MelodyC2 = [
-    p: 86
+    p: 86, v: melodyVel, c: 2
     ,
     ,
     ,
@@ -116,11 +116,39 @@ MelodyC2 = [
     -
 ]
 
+MelodyA_var = [
+    p: 70, v: melodyVel, c: 2
+    ,
+    ,
+    ,
+    p: 74
+    ,
+    p: 69
+    ,
+    ,
+    ,
+    p: 67
+    p: 69
+    p: 70
+    ,
+    ,
+    ,
+    p: 74
+    ,
+    p: 69
+    ,
+    ,
+    ,
+    -
+    -
+]
+
 Melody = [
+    //{true == true ? MelodyA : MelodyA_var}
     {MelodyA}
     {MelodyB}
     {MelodyC1}
-    {MelodyA}
+    {true == false ? (MelodyA || MelodyB) : MelodyA_var}
     {MelodyB}
     {MelodyC2}
 ]

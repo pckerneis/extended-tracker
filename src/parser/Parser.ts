@@ -356,7 +356,7 @@ export class Parser {
   }
 
   private primary(): Expr {
-    if (this.match(TokenType.NUMBER, TokenType.STRING))
+    if (this.match(TokenType.NUMBER, TokenType.STRING, TokenType.TRUE, TokenType.FALSE))
       return {kind: AstNodeKind.LITERAL, value: this.previous().literal, token: this.previous()};
 
     if (this.match(TokenType.LEFT_PAREN)) {

@@ -262,8 +262,8 @@ test('should parse ternary conditions', () => {
   expect(first.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
 });
 
-test.skip('should parse ternary steps', () => {
-  const testCode = `Program = [a == b ? {a} : {b}]`;
+test('should parse ternary steps', () => {
+  const testCode = `Program = [{a == b ? a : []}]`;
 
   const tokens = Scanner.scan(testCode);
   const exprs = Parser.parse(tokens);
@@ -273,11 +273,17 @@ test.skip('should parse ternary steps', () => {
 
   const assign = exprs[0] as Assign;
 
-  expect(assign.value.kind).toEqual(AstNodeKind.TERNARY_COND);
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
+  const sequence = assign.value as Sequence;
 
-  const first = assign.value as TernaryCondition;
-  expect(first.condition.kind).toBe(AstNodeKind.BINARY);
-  expect(first.ifBranch.kind).toBe(AstNodeKind.SEQUENCE);
-  expect(first.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(sequence.expressions[0].kind).toEqual(AstNodeKind.INNER_SEQUENCE);
+  const inner = sequence.expressions[0] as InnerSequence;
+
+  expect(inner.maybeSequence.kind).toEqual(AstNodeKind.TERNARY_COND);
+  const ternary = inner.maybeSequence as TernaryCondition;
+
+  expect(ternary.condition.kind).toBe(AstNodeKind.BINARY);
+  expect(ternary.ifBranch.kind).toBe(AstNodeKind.VARIABLE);
+  expect(ternary.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
 });
 
