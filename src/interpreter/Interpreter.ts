@@ -2,6 +2,7 @@ import {
   Assign,
   AstNodeKind,
   Binary,
+  Call,
   Control,
   Expr,
   Flag,
@@ -19,7 +20,7 @@ import {
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
 import {ErrorReporter} from '../error/ErrorReporter';
-import {Token, TokenType} from "../scanner/Tokens";
+import {Token, TokenType} from '../scanner/Tokens';
 
 export enum InstructionKind {
   Message = 'Message',
@@ -32,6 +33,7 @@ export enum InstructionKind {
   SequenceDeclaration = 'SequenceDeclaration',
   ControlMessage = 'ControlMessage',
   TernaryInstruction = 'TernaryInstruction',
+  LazyExpression = 'LazyExpression',
 }
 
 export interface Message {
@@ -98,20 +100,33 @@ export interface SequenceOperation {
   right: SequenceLike;
 }
 
+export interface LazyExpression {
+  kind: InstructionKind.LazyExpression;
+  expr: Expr;
+}
+
 export interface Program {
   [name: string]: Assignable;
 }
 
-export type SequenceLike = SequenceRef | SequenceDeclaration | SequenceOperation | TernaryInstruction;
+export type SequenceLike = SequenceRef | SequenceDeclaration | SequenceOperation | TernaryInstruction | LazyExpression;
 
 export type Assignable = SequenceLike | number | string | boolean;
 
+const builtInRefs = {
+  randf: () => Math.random(),
+};
+
 function findSequenceOperation(operator: Token): SequenceOperationKind {
-  switch(operator.lexeme) {
-    case '&': return 'all';
-    case '||': return 'any';
-    case '<<': return 'left';
-    case '>>': return 'right';
+  switch (operator.lexeme) {
+    case '&':
+      return 'all';
+    case '||':
+      return 'any';
+    case '<<':
+      return 'left';
+    case '>>':
+      return 'right';
   }
 
   throw new Error('Unhandled sequence operation token ' + operator.lexeme);
@@ -134,7 +149,7 @@ export class Interpreter {
 
     expressions.forEach(expression => {
       if (expression.kind === AstNodeKind.ASSIGN && output[expression.assignee.lexeme] == null) {
-        output[expression.assignee.lexeme] = this.evaluate(expression.value, expressions);
+        output[expression.assignee.lexeme] = this.evaluateLazy(expression.value, expressions);
       }
     });
 
@@ -180,7 +195,11 @@ export class Interpreter {
   }
 
   private static processJumpStep(jumpExpr: Jump): Step {
-    const jump: JumpMessage = {kind: InstructionKind.Jump, sequence: jumpExpr.sequence?.lexeme, flag: jumpExpr.flag?.lexeme};
+    const jump: JumpMessage = {
+      kind: InstructionKind.Jump,
+      sequence: jumpExpr.sequence?.lexeme,
+      flag: jumpExpr.flag?.lexeme
+    };
     return {kind: InstructionKind.Step, jump};
   }
 
@@ -240,14 +259,53 @@ export class Interpreter {
     }
   }
 
-  private static findDeclaration(variableName: string, topLevelExpressions: Expr[]): Assign {
+  private static findTopLevelDeclaration(variableName: string, topLevelExpressions: Expr[]): Assign {
     return topLevelExpressions.find(expr => expr.kind === AstNodeKind.ASSIGN
-      && expr.assignee.lexeme === variableName) as Assign;
+        && expr.assignee.lexeme === variableName) as Assign;
   }
 
-  private static evaluate(expr: Expr | undefined, topLevelExpressions: Expr[]): any {
-    if (! expr) {
-      return null;
+
+  private static evaluateLazy(expr: Expr | undefined, topLevelExpressions: Expr[]): any {
+    if (expr == null) {
+      return;
+    }
+
+    // return { kind: InstructionKind.LazyExpression, expr };
+
+    switch (expr.kind) {
+      case AstNodeKind.VARIABLE:
+        return this.evaluateVariable(expr, topLevelExpressions);
+      case AstNodeKind.LITERAL:
+        return {kind: InstructionKind.LazyExpression, expr};
+      case AstNodeKind.RL_UNARY:
+        return this.evaluateRLUnary(expr, topLevelExpressions);
+      case AstNodeKind.BINARY:
+        return this.evaluateBinary(expr, topLevelExpressions);
+      case AstNodeKind.GROUPING:
+        return this.evaluate(expr.expr, topLevelExpressions);
+      case AstNodeKind.LOGICAL:
+        return this.evaluateLogical(expr, topLevelExpressions);
+      case AstNodeKind.SEQUENCE:
+        return this.evaluateLazySequenceDeclaration(expr, topLevelExpressions);
+      case AstNodeKind.TERNARY_COND:
+      case AstNodeKind.CALL:
+        console.debug('lazy', expr)
+        return {kind: InstructionKind.LazyExpression, expr};
+    }
+  }
+
+  public static evaluate(expr: Expr | undefined, codeOrExpressions: string | Expr[]): any {
+    if (expr == null) {
+      return;
+    }
+
+    let topLevelExpressions: Expr[];
+
+    if (Array.isArray(codeOrExpressions)) {
+      topLevelExpressions = codeOrExpressions;
+    } else if (typeof codeOrExpressions === 'string') {
+      const tokens = Scanner.scan(codeOrExpressions);
+      topLevelExpressions = Parser.parse(tokens);
     }
 
     switch (expr.kind) {
@@ -267,6 +325,8 @@ export class Interpreter {
         return this.evaluateLogical(expr, topLevelExpressions);
       case AstNodeKind.SEQUENCE:
         return this.evaluateSequenceDeclaration(expr, topLevelExpressions);
+      case AstNodeKind.CALL:
+        return this.evaluateCall(expr, topLevelExpressions);
     }
   }
 
@@ -355,7 +415,13 @@ export class Interpreter {
   }
 
   private static evaluateVariable(expr: Variable, topLevelExpressions: Expr[]): any {
-    return this.evaluate(this.findDeclaration(expr.name.lexeme, topLevelExpressions)?.value, topLevelExpressions);
+    const declaration = this.findTopLevelDeclaration(expr.name.lexeme, topLevelExpressions);
+
+    if (declaration) {
+      return this.evaluate(declaration.value, topLevelExpressions);
+    } else {
+      return builtInRefs[expr.name.lexeme];
+    }
   }
 
   private static asNumber(thing: any): number {
@@ -372,7 +438,7 @@ export class Interpreter {
     }
   }
 
-  private static asSequence(thing: any)  {
+  private static asSequence(thing: any) {
     console.debug(thing);
   }
 
@@ -395,6 +461,34 @@ export class Interpreter {
     };
   }
 
+  private static evaluateLazySequenceDeclaration(sequence: Sequence, topLevelExpressions: Expr[]): SequenceDeclaration {
+    return {
+      kind: InstructionKind.SequenceDeclaration,
+      steps: sequence.expressions.map(channelsOrFlagOrJump => {
+        if (channelsOrFlagOrJump.kind === AstNodeKind.CONTROL_MESSAGE) {
+          return this.processControlMessage(channelsOrFlagOrJump, topLevelExpressions);
+        } else if (channelsOrFlagOrJump.kind === AstNodeKind.FLAG) {
+          return this.processFlagStep(channelsOrFlagOrJump);
+        } else if (channelsOrFlagOrJump.kind === AstNodeKind.JUMP) {
+          return this.processJumpStep(channelsOrFlagOrJump);
+        } else if (channelsOrFlagOrJump.kind === AstNodeKind.TRACKS) {
+          return this.processTracks(channelsOrFlagOrJump, topLevelExpressions);
+        } else if (channelsOrFlagOrJump.kind === AstNodeKind.INNER_SEQUENCE) {
+          return {
+            kind: InstructionKind.Step,
+            innerSequence: {
+              kind: InstructionKind.InnerSequence,
+              content: {
+                kind: InstructionKind.LazyExpression,
+                expr: channelsOrFlagOrJump.maybeSequence,
+              }
+            }
+          };
+        }
+      })
+    };
+  }
+
   private static processControlMessage(control: Control, topLevelExpressions: Expr[]): Step {
     const params = {};
     control.params.forEach(param => {
@@ -403,8 +497,20 @@ export class Interpreter {
       }
     });
 
-    const controlMessage: ControlMessage = ({kind: InstructionKind.ControlMessage, target: control.target.lexeme, params});
+    const controlMessage: ControlMessage = ({
+      kind: InstructionKind.ControlMessage,
+      target: control.target.lexeme,
+      params
+    });
     return {kind: InstructionKind.Step, controlMessage};
+  }
+
+  private static evaluateCall(expr: Call, topLevelExpressions: Expr[]): any {
+    const callee = this.evaluate(expr.callee, topLevelExpressions);
+
+    if (callee && typeof callee === 'function') {
+      return callee(expr.args);
+    }
   }
 }
 

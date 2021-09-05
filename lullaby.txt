@@ -144,7 +144,7 @@ MelodyA_var = [
 ]
 
 Melody = [
-    {false ? MelodyA : [ - ; {MelodyA_var}; ]}
+    {randf() > 0.5 ? MelodyA : [ - ; {MelodyA_var}; ]}
     {MelodyB || [ - ; {MelodyB}]}
     {MelodyC1}
     {false ? [] : MelodyA_var}

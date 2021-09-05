@@ -3,6 +3,7 @@ import {
   ControlMessage,
   InstructionKind,
   Interpreter,
+  LazyExpression,
   Program,
   SequenceDeclaration,
   SequenceLike,
@@ -176,7 +177,10 @@ class PlayHead {
       return;
     }
 
-    if (maybeSequence.kind === InstructionKind.SequenceRef) {
+    if (maybeSequence.kind === InstructionKind.LazyExpression) {
+      console.log('found lazy')
+      this.readLazyExpression(maybeSequence, stepArguments);
+    } else if (maybeSequence.kind === InstructionKind.SequenceRef) {
       this.readSequenceRef(maybeSequence, stepArguments);
     } else if (maybeSequence.kind === InstructionKind.SequenceDeclaration) {
       this.readSequenceDeclaration(name, maybeSequence, stepArguments);
@@ -535,7 +539,7 @@ class PlayHead {
     if (current && Object.keys(this.stepsBySequenceName).includes(current.name)) {
       const maybeSequence = this.stepsBySequenceName[current.name];
 
-      if (typeof maybeSequence === 'object' && maybeSequence.kind === InstructionKind.SequenceDeclaration) {
+      if (maybeSequence && typeof maybeSequence === 'object' && maybeSequence.kind === InstructionKind.SequenceDeclaration) {
         current.steps = maybeSequence.steps;
       }
     }
@@ -544,6 +548,11 @@ class PlayHead {
   private findFlagPosition(flagName: string, steps: Step[]) {
     const flagStep = steps.find(s => s.flag?.name === flagName);
     return steps.indexOf(flagStep);
+  }
+
+  private readLazyExpression(lazyExpression: LazyExpression, stepArguments: StepArguments): void {
+    console.log(lazyExpression.expr);
+    this.readSequenceLike(Interpreter.evaluate(lazyExpression.expr, this.player.codeProvider.code), stepArguments, '(lazy)');
   }
 }
 
