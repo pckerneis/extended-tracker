@@ -1,5 +1,5 @@
 import {Token, TokenType} from '../scanner/tokens';
-import {Expr, Flag, Jump, AstNodeKind, SequenceFlagRef, Control} from './Ast';
+import {AstNodeKind, Control, Expr, Flag, Jump, SequenceFlagRef} from './Ast';
 
 export class Parser {
   private current: number = 0;
@@ -53,31 +53,31 @@ export class Parser {
   private assignment(): Expr {
     this.consumeNewLines();
 
-    const expr = this.ternary();
+    const identifier = this.consume([TokenType.IDENTIFIER], 'Expect identifier');
+    const params: Token[] = [];
 
-    this.consumeNewLines();
+    if (this.match(TokenType.LEFT_PAREN)) {
+      if (! this.match(TokenType.RIGHT_PAREN)) {
+        do {
+          params.push(this.consume([TokenType.IDENTIFIER], 'Expect parameter name'));
+        } while (this.match(TokenType.COMMA));
 
-    if (this.match(TokenType.EQUAL)) {
-      this.consumeNewLines();
-
-      const equals = this.previous();
-
-      if (expr.kind === 'VARIABLE') {
-        const value = this.expression();
-        const name = expr.name;
-
-        return {
-          kind: AstNodeKind.ASSIGN,
-          assignee: name,
-          equals,
-          value,
-        };
-      } else {
-        throw new ParseError(equals, 'Invalid assignment target');
+        this.consume([TokenType.RIGHT_PAREN], `Expect "${TokenType.RIGHT_PAREN}" after parameters`);
       }
     }
 
-    return expr;
+    this.consumeNewLines();
+    const equals = this.consume([TokenType.EQUAL], `Expect "${TokenType.EQUAL}" after identifier`);
+    this.consumeNewLines();
+    const value = this.expression();
+
+    return {
+      kind: AstNodeKind.ASSIGN,
+      assignee: identifier,
+      equals,
+      value,
+      params,
+    };
   }
 
   private expression(): Expr {

@@ -1,9 +1,9 @@
 import {
   Assignable,
-  ControlMessage,
+  ControlMessage, Declaration,
   InstructionKind,
   Interpreter,
-  LazyExpression,
+  LazyExpression, ParametrizedSequence,
   Program,
   SequenceDeclaration,
   SequenceLike,
@@ -15,6 +15,7 @@ import {
 import {MidiOutput} from '../midi/MidiOutput';
 import {ErrorReporter} from '../error/ErrorReporter';
 import {Scheduler} from '../scheduler/Scheduler';
+import {Expr} from '../parser/Ast';
 
 export interface CodeProvider {
   code: string;
@@ -118,6 +119,7 @@ class PlayHead {
   private _stepDuration: number;
 
   private sequenceStack: { name: string, steps: Step[] }[] = [];
+  private context: Expr[];
 
   public set stepDuration(stepDuration: number) {
     if (!isNaN(stepDuration) && stepDuration > 0) {
@@ -136,18 +138,6 @@ class PlayHead {
     this.stepDuration = stepDuration;
   }
 
-  public get stepsBySequenceName(): Program {
-    return this.player.program;
-  }
-
-  public get scheduler(): Scheduler {
-    return this.player.scheduler;
-  }
-
-  public get currentSequence(): Step[] {
-    return this.sequenceStack[this.sequenceStack.length - 1]?.steps ?? [];
-  }
-
   static createAtRoot(player: MidiPlayer, sequenceName: string, stepArguments: StepArguments, stepDuration: number, timePos: number): PlayHead {
     const playHead = new PlayHead(player, stepDuration, timePos);
     playHead.readRootSequence(sequenceName, stepArguments);
@@ -160,16 +150,32 @@ class PlayHead {
     return playHead;
   }
 
+  public get program(): Program {
+    return this.player.program;
+  }
+
+  public get scheduler(): Scheduler {
+    return this.player.scheduler;
+  }
+
+  public get currentSequence(): Step[] {
+    return this.sequenceStack[this.sequenceStack.length - 1]?.steps ?? [];
+  }
+
+  private findDeclaration(name: string): Declaration {
+    return this.program.declarations.find(d => d.name === name);
+  }
+
   private readRootSequence(sequenceName: string, stepArguments: StepArguments): void {
     this.reinterpretCode();
 
-    let instruction = this.stepsBySequenceName[sequenceName];
+    let declaration = this.findDeclaration(sequenceName);
 
-    if (instruction == null) {
+    if (declaration == null) {
       throw new Error('Could not find root declaration with name ' + sequenceName);
     }
 
-    this.readSequenceLike(instruction, stepArguments, sequenceName);
+    this.readSequenceLike(declaration.value, stepArguments, sequenceName);
   }
 
   private readSequenceLike(maybeSequence: Assignable, stepArguments: StepArguments, name: string): void {
@@ -177,9 +183,11 @@ class PlayHead {
       return;
     }
 
-    if (maybeSequence.kind === InstructionKind.LazyExpression) {
-      console.log('found lazy')
-      this.readLazyExpression(maybeSequence, stepArguments);
+    // TODO use switch..
+    if (maybeSequence.kind === InstructionKind.ParametrizedSequence) {
+      this.readParametrizedSequence(name, maybeSequence, stepArguments);
+    } else if (maybeSequence.kind === InstructionKind.LazyExpression) {
+      this.readLazyExpression(maybeSequence, stepArguments, this.context);
     } else if (maybeSequence.kind === InstructionKind.SequenceRef) {
       this.readSequenceRef(maybeSequence, stepArguments);
     } else if (maybeSequence.kind === InstructionKind.SequenceDeclaration) {
@@ -201,6 +209,24 @@ class PlayHead {
     this.readNextStep({
       ...stepArguments,
       onEnded: () => {
+        this.stepPositionInSequence = previousPosition + 1;
+        this.popSequenceAndRefreshCurrent();
+        this.readNextStep(stepArguments);
+      }
+    });
+  }
+
+  private readParametrizedSequence(name: string, parametrizedSequence: ParametrizedSequence, stepArguments: StepArguments): void {
+    this.context = parametrizedSequence.call.args;
+
+    const previousPosition = this.stepPositionInSequence;
+    this.stepPositionInSequence = 0;
+    this.pushSequence({name, steps: parametrizedSequence.callee.steps});
+
+    this.readNextStep({
+      ...stepArguments,
+      onEnded: () => {
+        this.context = null;
         this.stepPositionInSequence = previousPosition + 1;
         this.popSequenceAndRefreshCurrent();
         this.readNextStep(stepArguments);
@@ -402,7 +428,12 @@ class PlayHead {
     let noteOnCounter = 0;
 
     step.messages.forEach(message => {
-      let {p, v, i, c} = message.params;
+      const evaluatedParams = {} as any;
+      Object.entries(message.params)
+          .forEach(([key, value]) => evaluatedParams[key] = isPrimitive(value) ? value : Interpreter.evaluate(value, this.player.codeProvider.code, this.context));
+
+      let {p, v, i, c} = evaluatedParams;
+
       let track = this.tracks.get(i);
 
       if (track == null) {
@@ -431,8 +462,10 @@ class PlayHead {
   private readSequenceRef(ref: SequenceRef, stepArguments: StepArguments) {
     const {sequenceName, flagName} = ref;
 
-    if (this.stepsBySequenceName[sequenceName] != null && !isPrimitive(this.stepsBySequenceName[sequenceName])) {
-      const targetSequence = this.stepsBySequenceName[sequenceName] as SequenceDeclaration;
+    const declaration = this.findDeclaration(sequenceName);
+
+    if (declaration != null && !isPrimitive(declaration.value)) {
+      const targetSequence = declaration.value as SequenceDeclaration;
       const previousPosition = this.stepPositionInSequence;
       this.stepPositionInSequence = 0;
 
@@ -465,7 +498,7 @@ class PlayHead {
     this.refreshCurrent();
 
     if (step.jump.sequence) {
-      if (this.stepsBySequenceName[step.jump.sequence] != null) {
+      if (this.findDeclaration(step.jump.sequence) != null) {
         this.stepPositionInSequence = 0;
       } else {
         this.advance(stepArguments);
@@ -536,8 +569,8 @@ class PlayHead {
   private refreshCurrent(): void {
     const current = this.sequenceStack[this.sequenceStack.length - 1];
 
-    if (current && Object.keys(this.stepsBySequenceName).includes(current.name)) {
-      const maybeSequence = this.stepsBySequenceName[current.name];
+    if (current && Object.keys(this.program).includes(current.name)) {
+      const maybeSequence = this.findDeclaration(current.name)?.value;
 
       if (maybeSequence && typeof maybeSequence === 'object' && maybeSequence.kind === InstructionKind.SequenceDeclaration) {
         current.steps = maybeSequence.steps;
@@ -550,9 +583,8 @@ class PlayHead {
     return steps.indexOf(flagStep);
   }
 
-  private readLazyExpression(lazyExpression: LazyExpression, stepArguments: StepArguments): void {
-    console.log(lazyExpression.expr);
-    this.readSequenceLike(Interpreter.evaluate(lazyExpression.expr, this.player.codeProvider.code), stepArguments, '(lazy)');
+  private readLazyExpression(lazyExpression: LazyExpression, stepArguments: StepArguments, context: Expr[]): void {
+    this.readSequenceLike(Interpreter.evaluate(lazyExpression.expr, this.player.codeProvider.code, context), stepArguments, '(lazy)');
   }
 }
 

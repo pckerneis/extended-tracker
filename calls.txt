@@ -1,8 +1,10 @@
 A = [p: 64, v: 120]
 B = [p: 64 + 7, v: 120]
 
+A_fn(a) = [p: a, v: 120]
+
 Root = [
     # start
-    {randf() > 0.5 ? A : B}
+    {A_fn(a: 60 + randf() * 16)}
     @ start
 ]

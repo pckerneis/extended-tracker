@@ -59,6 +59,7 @@ export interface Assign {
   readonly value: Expr;
   readonly assignee: Token;
   readonly equals: Token;
+  readonly params: Token[];
 }
 
 export interface Silence {
