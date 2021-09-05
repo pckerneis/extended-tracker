@@ -397,16 +397,20 @@ class PlayHead {
     const {sequenceName, flagName} = ref;
 
     if (this.stepsBySequenceName[sequenceName] != null && !isPrimitive(this.stepsBySequenceName[sequenceName])) {
-      const steps = this.stepsBySequenceName[sequenceName] as SequenceDeclaration;
+      const targetSequence = this.stepsBySequenceName[sequenceName] as SequenceDeclaration;
       const previousPosition = this.stepPositionInSequence;
+      this.stepPositionInSequence = 0;
 
       if (flagName) {
-        this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
+        const foundIndex = this.findFlagPosition(flagName, targetSequence.steps);
+        if (foundIndex > 0) {
+          this.stepPositionInSequence = foundIndex;
+        }
       } else {
         this.stepPositionInSequence = 0;
       }
 
-      this.pushSequence({name: sequenceName, steps: steps.steps});
+      this.pushSequence({name: sequenceName, steps: targetSequence.steps});
 
       this.nextStep({
         ...stepArguments,
