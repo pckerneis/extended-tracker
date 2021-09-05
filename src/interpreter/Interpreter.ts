@@ -98,8 +98,8 @@ export interface SequenceOperation {
   right: SequenceLike;
 }
 
-export interface MessageSequence {
-  [sequenceName: string]: Assignable;
+export interface Program {
+  [name: string]: Assignable;
 }
 
 export type SequenceLike = SequenceRef | SequenceDeclaration | SequenceOperation | TernaryInstruction;
@@ -119,7 +119,7 @@ function findSequenceOperation(operator: Token): SequenceOperationKind {
 
 export class Interpreter {
 
-  public static interpret(code: string, errorReporter: ErrorReporter): MessageSequence {
+  public static interpret(code: string, errorReporter: ErrorReporter): Program {
     try {
       const tokens = Scanner.scan(code);
       const expressions = Parser.parse(tokens);
@@ -129,7 +129,7 @@ export class Interpreter {
     }
   }
 
-  private static readProgram(expressions: Expr[]): MessageSequence {
+  private static readProgram(expressions: Expr[]): Program {
     let output = {};
 
     expressions.forEach(expression => {
@@ -185,7 +185,7 @@ export class Interpreter {
   }
 
   private static processInnerSequence(innerSequence: InnerSequence, topLevelExpressions: Expr[]): Step {
-    if (innerSequence.maybeSequence.kind === 'SEQUENCE_FLAG_REF') {
+    if (innerSequence.maybeSequence.kind === AstNodeKind.SEQUENCE_FLAG_REF) {
       const ref = innerSequence.maybeSequence as SequenceFlagRef;
 
       return {
@@ -199,7 +199,7 @@ export class Interpreter {
           },
         }
       };
-    } else if (innerSequence.maybeSequence.kind === 'VARIABLE') {
+    } else if (innerSequence.maybeSequence.kind === AstNodeKind.VARIABLE) {
       return {
         kind: InstructionKind.Step,
         innerSequence: {
@@ -210,7 +210,7 @@ export class Interpreter {
           },
         }
       };
-    } else if (['LOGICAL', 'BINARY'].includes(innerSequence.maybeSequence.kind)) {
+    } else if ([AstNodeKind.LOGICAL, AstNodeKind.BINARY].includes(innerSequence.maybeSequence.kind)) {
       const logicalOrBinary = innerSequence.maybeSequence as Logical | Binary;
       return {
         kind: InstructionKind.Step,
@@ -241,7 +241,7 @@ export class Interpreter {
   }
 
   private static findDeclaration(variableName: string, topLevelExpressions: Expr[]): Assign {
-    return topLevelExpressions.find(expr => expr.kind === 'ASSIGN'
+    return topLevelExpressions.find(expr => expr.kind === AstNodeKind.ASSIGN
       && expr.assignee.lexeme === variableName) as Assign;
   }
 
@@ -251,21 +251,21 @@ export class Interpreter {
     }
 
     switch (expr.kind) {
-      case 'VARIABLE':
+      case AstNodeKind.VARIABLE:
         return this.evaluateVariable(expr, topLevelExpressions);
-      case 'LITERAL':
+      case AstNodeKind.LITERAL:
         return evaluateLiteral(expr);
-      case 'RL_UNARY':
+      case AstNodeKind.RL_UNARY:
         return this.evaluateRLUnary(expr, topLevelExpressions);
-      case 'BINARY':
+      case AstNodeKind.BINARY:
         return this.evaluateBinary(expr, topLevelExpressions);
-      case 'GROUPING':
+      case AstNodeKind.GROUPING:
         return this.evaluate(expr.expr, topLevelExpressions);
-      case 'TERNARY_COND':
+      case AstNodeKind.TERNARY_COND:
         return this.evaluateTernaryCondition(expr, topLevelExpressions);
-      case 'LOGICAL':
+      case AstNodeKind.LOGICAL:
         return this.evaluateLogical(expr, topLevelExpressions);
-      case 'SEQUENCE':
+      case AstNodeKind.SEQUENCE:
         return this.evaluateSequenceDeclaration(expr, topLevelExpressions);
     }
   }
