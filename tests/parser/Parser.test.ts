@@ -7,7 +7,7 @@ import {
   Sequence,
   InnerSequence,
   Variable,
-  Binary
+  Binary, Call
 } from '../../src/parser/Ast';
 import {Parser} from '../../src/parser/Parser';
 import {Scanner} from '../../src/scanner/Scanner';
@@ -276,7 +276,6 @@ test('should parse left/right sequence operations', () => {
   expect(second.operator.lexeme).toEqual('>>');
 });
 
-
 test('should parse ternary conditions', () => {
   const testCode = `Program = a == b ? [] : []`;
 
@@ -319,5 +318,27 @@ test('should parse ternary steps', () => {
   expect(ternary.condition.kind).toBe(AstNodeKind.BINARY);
   expect(ternary.ifBranch.kind).toBe(AstNodeKind.VARIABLE);
   expect(ternary.elseBranch.kind).toBe(AstNodeKind.SEQUENCE);
+});
+
+test('should parse calls', () => {
+  const testCode = `Program = [{a(b: 14, c: false)}]`;
+
+  const tokens = Scanner.scan(testCode);
+  const exprs = Parser.parse(tokens);
+
+  expect(exprs.length).toEqual(1);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
+
+  const assign = exprs[0] as Assign;
+  expect(assign.value.kind).toEqual(AstNodeKind.SEQUENCE);
+  const seq = assign.value as Sequence;
+  expect(seq.expressions[0].kind).toBe(AstNodeKind.INNER_SEQUENCE);
+  const inner = seq.expressions[0] as InnerSequence;
+  expect(inner.maybeSequence.kind).toBe(AstNodeKind.CALL);
+
+  const call = inner.maybeSequence as Call;
+  expect(call.callee.kind).toBe(AstNodeKind.VARIABLE);
+  expect(call.args.length).toBe(2);
+  expect(call.args[0].kind).toBe(AstNodeKind.PARAM);
 });
 

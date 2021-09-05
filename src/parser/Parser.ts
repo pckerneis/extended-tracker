@@ -153,7 +153,7 @@ export class Parser {
 
       const params: Expr[] = [];
 
-      params.push(...this.paramList());
+      params.push(...this.paramList(TokenType.NEW_LINE, TokenType.PIPE));
 
       tracks.push({
         kind: AstNodeKind.PARAMS,
@@ -164,11 +164,11 @@ export class Parser {
     return tracks;
   }
 
-  private paramList(): Expr[] {
+  private paramList(...closingTokens: TokenType[]): Expr[] {
     const expressions: Expr[] = [];
 
     do {
-      if (this.check(TokenType.NEW_LINE, TokenType.PIPE)) {
+      if (this.check(...closingTokens)) {
         break;
       }
 
@@ -255,24 +255,6 @@ export class Parser {
     return expr;
   }
 
-  // private sequenceBinary(): Expr {
-  //   let expr = this.or();
-  //
-  //   while (this.match(TokenType.PIPE, TokenType.AMPERSAND, TokenType.PLUS)) {
-  //     const operator = this.previous();
-  //     const right = this.expression();
-  //
-  //     expr = {
-  //       kind: Kind.BINARY,
-  //       left: expr,
-  //       right,
-  //       operator,
-  //     };
-  //   }
-  //
-  //   return expr;
-  // }
-
   private or(): Expr {
     let expr = this.and();
 
@@ -352,7 +334,34 @@ export class Parser {
       return {kind: AstNodeKind.RL_UNARY, operator, right};
     }
 
-    return this.primary();
+    return this.call();
+  }
+
+  private call(): Expr {
+    let expr = this.primary();
+
+    while (true) {
+      if (this.match(TokenType.LEFT_PAREN)) {
+        expr = this.finishCall(expr);
+      } else {
+        break;
+      }
+    }
+
+    return expr;
+  }
+
+  private finishCall(callee: Expr): Expr {
+    const leftParen = this.previous();
+    const args: Expr[] = this.paramList(TokenType.RIGHT_PAREN);
+    const rightParen: Token = this.consume([TokenType.RIGHT_PAREN], 'Expect ")" after arguments');
+
+    return {
+      kind: AstNodeKind.CALL,
+      parenTokens: [leftParen, rightParen],
+      args,
+      callee
+    }
   }
 
   private primary(): Expr {
@@ -367,7 +376,7 @@ export class Parser {
 
     if (this.match(TokenType.IDENTIFIER, this.silenceToken)) {
       if (this.peek().type === TokenType.DASH) {
-        return this.innerSequenceName();
+        return this.sequenceFlagRef();
       }
 
       return {kind: AstNodeKind.VARIABLE, name: this.previous()};
@@ -505,7 +514,7 @@ export class Parser {
     }
   }
 
-  private innerSequenceName(): SequenceFlagRef {
+  private sequenceFlagRef(): SequenceFlagRef {
     const sequenceName = this.previous();
     let flagToken: Token;
     let flagName: Token;
