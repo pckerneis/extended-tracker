@@ -312,7 +312,7 @@ export class Parser {
   private comparison(): Expr {
     let expr: Expr = this.addition();
 
-    while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
+    while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL, TokenType.LEFT_LEFT, TokenType.RIGHT_RIGHT)) {
       const operator: Token = this.previous();
       const right: Expr = this.addition();
       expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};

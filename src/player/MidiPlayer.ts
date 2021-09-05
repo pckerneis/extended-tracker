@@ -68,13 +68,18 @@ export class MidiPlayer {
     this.reinterpretCode();
 
     if (this.latestInterpretedCode) {
-      this.playHead = PlayHead.createAtRoot(this, 'Root', {
-        onEnded: () => {
-          this.output.allSoundOff();
-          onEnded();
-        }, onStepPlay
-      }, 0.25, 0);
-      this._scheduler.start();
+      try {
+        this.playHead = PlayHead.createAtRoot(this, 'Root', {
+          onEnded: () => {
+            this.output.allSoundOff();
+            onEnded();
+          }, onStepPlay
+        }, 0.25, 0);
+        this._scheduler.start();
+      } catch (e) {
+        this.errorReporter.reportError(e);
+        onEnded();
+      }
     } else {
       onEnded();
     }
@@ -145,9 +150,9 @@ class PlayHead {
     return playHead;
   }
 
-  static createForSequence(player: MidiPlayer, sequence: SequenceLike, stepArguments: StepArguments, stepDuration: number, timePos: number, sequenceName: string): PlayHead {
+  static createForSequenceLike(player: MidiPlayer, sequence: SequenceLike, stepArguments: StepArguments, stepDuration: number, timePos: number, sequenceName: string): PlayHead {
     const playHead = new PlayHead(player, stepDuration, timePos);
-    playHead.readSequenceOrOperation(sequence, stepArguments, sequenceName);
+    playHead.readSequenceLike(sequence, stepArguments, sequenceName);
     return playHead;
   }
 
@@ -160,22 +165,24 @@ class PlayHead {
       throw new Error('Could not find root declaration with name ' + sequenceName);
     }
 
-    this.readSequenceOrOperation(instruction, stepArguments, sequenceName);
+    this.readSequenceLike(instruction, stepArguments, sequenceName);
   }
 
-  private readSequenceOrOperation(maybeSequence: Assignable, stepArguments: StepArguments, name: string): void {
+  private readSequenceLike(maybeSequence: Assignable, stepArguments: StepArguments, name: string): void {
     if (!maybeSequence || typeof maybeSequence !== 'object') {
       return;
     }
 
-    if (maybeSequence.kind === InstructionKind.SequenceDeclaration) {
+    if (maybeSequence.kind === InstructionKind.SequenceRef) {
+      this.readSequenceRef(maybeSequence, stepArguments);
+    } else if (maybeSequence.kind === InstructionKind.SequenceDeclaration) {
       this.readSequenceDeclaration(name, maybeSequence, stepArguments);
     } else if (maybeSequence.kind === InstructionKind.SequenceOperation) {
       this.readSequenceOperation(maybeSequence, stepArguments, name);
     } else if (maybeSequence.kind === InstructionKind.TernaryInstruction) {
       this.readTernary(maybeSequence, stepArguments, name);
     } else {
-      console.debug(maybeSequence);
+      console.debug('Could not read as sequence', maybeSequence);
     }
   }
 
@@ -198,10 +205,15 @@ class PlayHead {
     const operation = maybeSequence as SequenceOperation;
     const operationKind = maybeSequence.operation;
 
-    if (operationKind == 'all') {
-      this.readAll(operation, stepArguments, name);
-    } else if (operationKind == 'any') {
-      this.readAny(operation, stepArguments, name);
+    switch(operationKind) {
+      case 'all':
+        return this.readAll(operation, stepArguments, name);
+      case 'any':
+        return this.readAny(operation, stepArguments, name);
+      case 'left':
+        return this.readLeft(operation, stepArguments);
+      case 'right':
+        return this.readRight(operation, stepArguments);
     }
   }
 
@@ -209,7 +221,7 @@ class PlayHead {
     let firstEnded = false;
     let secondEnded = false;
 
-    const leftHead = PlayHead.createForSequence(this.player, operation.left, {
+    const leftHead = PlayHead.createForSequenceLike(this.player, operation.left, {
           ...stepArguments,
           onEnded: () => {
             firstEnded = true;
@@ -224,7 +236,7 @@ class PlayHead {
         this.nextStepTime,
         name);
 
-    const rightHead = PlayHead.createForSequence(this.player, operation.right, {
+    const rightHead = PlayHead.createForSequenceLike(this.player, operation.right, {
           ...stepArguments,
           onEnded: () => {
             secondEnded = true;
@@ -244,7 +256,7 @@ class PlayHead {
     let firstEnded = false;
     let secondEnded = false;
 
-    const leftHead = PlayHead.createForSequence(this.player, operation.left, {
+    const leftHead = PlayHead.createForSequenceLike(this.player, operation.left, {
           ...stepArguments,
           onEnded: () => {
             firstEnded = true;
@@ -259,7 +271,7 @@ class PlayHead {
         this.nextStepTime,
         name);
 
-    const rightHead = PlayHead.createForSequence(this.player, operation.right, {
+    const rightHead = PlayHead.createForSequenceLike(this.player, operation.right, {
           ...stepArguments,
           onEnded: () => {
             secondEnded = true;
@@ -273,6 +285,48 @@ class PlayHead {
         this.stepDuration,
         this.nextStepTime,
         name);
+  }
+
+  private readLeft(operation: SequenceOperation, stepArguments: StepArguments) {
+    const leftHead = PlayHead.createForSequenceLike(this.player, operation.left, {
+          ...stepArguments,
+          onEnded: () => {
+            this.nextStepTime = leftHead.nextStepTime;
+            this.advance(stepArguments);
+          },
+        },
+        this.stepDuration,
+        this.nextStepTime,
+        '(left)');
+
+    PlayHead.createForSequenceLike(this.player, operation.right, {
+          ...stepArguments,
+          onEnded: () => {},
+        },
+        this.stepDuration,
+        this.nextStepTime,
+        '(right)');
+  }
+
+  private readRight(operation: SequenceOperation, stepArguments: StepArguments) {
+    PlayHead.createForSequenceLike(this.player, operation.left, {
+          ...stepArguments,
+          onEnded: () => {},
+        },
+        this.stepDuration,
+        this.nextStepTime,
+        '(left)');
+
+    const rightHead = PlayHead.createForSequenceLike(this.player, operation.right, {
+          ...stepArguments,
+          onEnded: () => {
+            this.nextStepTime = rightHead.nextStepTime;
+            this.advance(stepArguments);
+          },
+        },
+        this.stepDuration,
+        this.nextStepTime,
+        '(right)');
   }
 
   private advance(stepArguments: StepArguments) {
@@ -336,14 +390,7 @@ class PlayHead {
 
   private innerSequence(step: Step, stepArguments: StepArguments): void {
     this.reinterpretCode();
-
-    if (step.innerSequence.content.kind === InstructionKind.SequenceRef) {
-      this.readSequenceRef(step.innerSequence.content, stepArguments);
-    } else if (step.innerSequence.content.kind === InstructionKind.SequenceOperation) {
-      this.readSequenceOrOperation(step.innerSequence.content, stepArguments, '(op)');
-    } else if (step.innerSequence.content.kind === InstructionKind.TernaryInstruction) {
-      this.readSequenceOrOperation(step.innerSequence.content, stepArguments, '?');
-    }
+    this.readSequenceLike(step.innerSequence.content, stepArguments, 'inner');
   }
 
   private readSequenceRef(ref: SequenceRef, stepArguments: StepArguments) {
@@ -483,9 +530,9 @@ class PlayHead {
       }
     }
     if (maybeSequence.condition) {
-      this.readSequenceOrOperation(maybeSequence.ifBranch, wrappedArgs, name);
+      this.readSequenceLike(maybeSequence.ifBranch, wrappedArgs, name);
     } else {
-      this.readSequenceOrOperation(maybeSequence.elseBranch, wrappedArgs, name);
+      this.readSequenceLike(maybeSequence.elseBranch, wrappedArgs, name);
     }
   }
 }

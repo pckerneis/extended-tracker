@@ -89,7 +89,7 @@ export interface ControlMessage {
   target: string;
 }
 
-export type SequenceOperationKind = 'left' | 'all' | 'any';
+export type SequenceOperationKind = 'left' | 'right' | 'all' | 'any';
 
 export interface SequenceOperation {
   kind: InstructionKind.SequenceOperation;
@@ -110,6 +110,8 @@ function findSequenceOperation(operator: Token): SequenceOperationKind {
   switch(operator.lexeme) {
     case '&': return 'all';
     case '||': return 'any';
+    case '<<': return 'left';
+    case '>>': return 'right';
   }
 
   throw new Error('Unhandled sequence operation token ' + operator.lexeme);
@@ -208,16 +210,17 @@ export class Interpreter {
           },
         }
       };
-    } else if (innerSequence.maybeSequence.kind === 'LOGICAL') {
+    } else if (['LOGICAL', 'BINARY'].includes(innerSequence.maybeSequence.kind)) {
+      const logicalOrBinary = innerSequence.maybeSequence as Logical | Binary;
       return {
         kind: InstructionKind.Step,
         innerSequence: {
           kind: InstructionKind.InnerSequence,
           content: {
             kind: InstructionKind.SequenceOperation,
-            operation: findSequenceOperation(innerSequence.maybeSequence.operator),
-            left: this.evaluate(innerSequence.maybeSequence.left, topLevelExpressions),
-            right: this.evaluate(innerSequence.maybeSequence.right, topLevelExpressions),
+            operation: findSequenceOperation(logicalOrBinary.operator),
+            left: this.evaluate(logicalOrBinary.left, topLevelExpressions),
+            right: this.evaluate(logicalOrBinary.right, topLevelExpressions),
           }
         }
       }
@@ -319,6 +322,13 @@ export class Interpreter {
         return this.asSequence(left) === this.asSequence(right);
       case TokenType.AMPERSAND:
         return this.asSequence(left) !== this.asSequence(right);
+      case TokenType.RIGHT_RIGHT:
+      case TokenType.LEFT_LEFT:
+        const operation: SequenceOperation = {
+          kind: InstructionKind.SequenceOperation,
+          left, right, operation: findSequenceOperation(expr.operator)
+        };
+        return operation as any;
       case TokenType.EQUAL_EQUAL:
         return this.asNumber(left) === this.asNumber(right);
       case TokenType.BANG_EQUAL:

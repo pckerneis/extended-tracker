@@ -8,11 +8,11 @@ seqC = [p: 75 + 5, v: 20 | p: 72 - 15, v: 40]
 
 seqA = [
 {seqC}
-{seqB # end}
+{seqB}
 ]
 
 
-Program = [
+Root = [
 # start
 - | | , | | -
 - | -

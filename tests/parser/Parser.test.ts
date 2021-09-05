@@ -1,4 +1,14 @@
-import {Assign, Flag, SequenceFlagRef, Jump, Logical, Sequence, InnerSequence, Variable} from '../../src/parser/Ast';
+import {
+  Assign,
+  Flag,
+  SequenceFlagRef,
+  Jump,
+  Logical,
+  Sequence,
+  InnerSequence,
+  Variable,
+  Binary
+} from '../../src/parser/Ast';
 import {Parser} from '../../src/parser/Parser';
 import {Scanner} from '../../src/scanner/Scanner';
 import {AstNodeKind, TernaryCondition, TrackList} from "../../dist/parser/Ast";
@@ -240,6 +250,30 @@ test('should parse sequence operations', () => {
   expect(second.left.kind).toBe(AstNodeKind.SEQUENCE);
   expect(second.right.kind).toBe(AstNodeKind.SEQUENCE);
   expect(second.operator.lexeme).toEqual('&');
+});
+
+test('should parse left/right sequence operations', () => {
+  const testCode = `Program = [] >> [] << []`;
+
+  const tokens = Scanner.scan(testCode);
+  const exprs = Parser.parse(tokens);
+
+  expect(exprs.length).toEqual(1);
+  expect(exprs[0].kind).toEqual(AstNodeKind.ASSIGN);
+
+  const assign = exprs[0] as Assign;
+
+  expect(assign.value.kind).toEqual(AstNodeKind.BINARY);
+
+  const first = assign.value as Binary;
+  expect(first.left.kind).toBe(AstNodeKind.BINARY);
+  expect(first.right.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(first.operator.lexeme).toEqual('<<');
+
+  const second = first.left as Binary;
+  expect(second.left.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(second.right.kind).toBe(AstNodeKind.SEQUENCE);
+  expect(second.operator.lexeme).toEqual('>>');
 });
 
 

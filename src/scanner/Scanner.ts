@@ -131,10 +131,10 @@ export class Scanner {
           this.addToken(this.match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL);
           break;
         case '<':
-          this.addToken(this.match('=') ? TokenType.LESS_EQUAL : TokenType.LESS);
+          this.addToken(this.match('=') ? TokenType.LESS_EQUAL : (this.match('<') ? TokenType.LEFT_LEFT : TokenType.LESS));
           break;
         case '>':
-          this.addToken(this.match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER);
+          this.addToken(this.match('=') ? TokenType.GREATER_EQUAL : (this.match('>') ? TokenType.RIGHT_RIGHT : TokenType.GREATER));
           break;
         case '\n':
           this.addToken(TokenType.NEW_LINE);

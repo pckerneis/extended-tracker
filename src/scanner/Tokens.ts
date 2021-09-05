@@ -24,6 +24,8 @@ export enum TokenType {
   GREATER         = '>',
   LESS_EQUAL      = '<=',
   GREATER_EQUAL   = '>=',
+  LEFT_LEFT       = '<<',
+  RIGHT_RIGHT     = '>>',
   PIPE            = '|',
   DOUBLE_PIPE     = '||',
   LEFT_BRACKET    = '[',
