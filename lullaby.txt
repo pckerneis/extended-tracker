@@ -144,11 +144,10 @@ MelodyA_var = [
 ]
 
 Melody = [
-    //{true == true ? MelodyA : MelodyA_var}
-    {MelodyA}
-    {MelodyB}
+    {false ? MelodyA : [ - ; {MelodyA_var}; ]}
+    {MelodyB || [ - ; {MelodyB}]}
     {MelodyC1}
-    {true == false ? (MelodyA || MelodyB) : MelodyA_var}
+    {false ? [] : MelodyA_var}
     {MelodyB}
     {MelodyC2}
 ]
@@ -157,6 +156,6 @@ Root = [
     # start
     $ player speed: 110 / 60
     $ head stepDuration: 1/2
-    {[{Chords} ; {Chords}] & Melody}
+    {[ {Chords} ; {Chords} ] || Melody || [ - ; - ; {Melody} ] }
     @ start
 ]

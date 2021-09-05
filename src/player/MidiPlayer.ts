@@ -4,8 +4,8 @@ import {
   Interpreter,
   MessageSequence,
   SequenceDeclaration, SequenceLike,
-  SequenceOperation,
-  Step
+  SequenceOperation, SequenceRef,
+  Step, TernaryInstruction
 } from '../interpreter/Interpreter';
 import {MidiOutput} from '../midi/MidiOutput';
 import {ErrorReporter} from '../error/ErrorReporter';
@@ -169,21 +169,29 @@ class PlayHead {
     }
 
     if (maybeSequence.kind === InstructionKind.SequenceDeclaration) {
-      const previousPosition = this.stepPositionInSequence;
-      this.stepPositionInSequence = 0;
-      this.pushSequence({name, steps: maybeSequence.steps});
-
-      this.nextStep({
-        ...stepArguments,
-        onEnded: () => {
-          this.stepPositionInSequence = previousPosition + 1;
-          this.popSequenceAndRefreshCurrent();
-          this.nextStep(stepArguments);
-        }
-      });
+      this.readSequenceDeclaration(name, maybeSequence, stepArguments);
     } else if (maybeSequence.kind === InstructionKind.SequenceOperation) {
       this.readSequenceOperation(maybeSequence, stepArguments, name);
+    } else if (maybeSequence.kind === InstructionKind.TernaryInstruction) {
+      this.readTernary(maybeSequence, stepArguments, name);
+    } else {
+      console.debug(maybeSequence);
     }
+  }
+
+  private readSequenceDeclaration(name: string, maybeSequence: SequenceDeclaration, stepArguments: StepArguments) {
+    const previousPosition = this.stepPositionInSequence;
+    this.stepPositionInSequence = 0;
+    this.pushSequence({name, steps: maybeSequence.steps});
+
+    this.nextStep({
+      ...stepArguments,
+      onEnded: () => {
+        this.stepPositionInSequence = previousPosition + 1;
+        this.popSequenceAndRefreshCurrent();
+        this.nextStep(stepArguments);
+      }
+    });
   }
 
   private readSequenceOperation(maybeSequence: SequenceOperation, stepArguments: StepArguments, name: string) {
@@ -330,34 +338,39 @@ class PlayHead {
     this.reinterpretCode();
 
     if (step.innerSequence.content.kind === InstructionKind.SequenceRef) {
-
-      const {sequenceName, flagName} = step.innerSequence.content;
-
-      if (this.stepsBySequenceName[sequenceName] != null && !isPrimitive(this.stepsBySequenceName[sequenceName])) {
-        const steps = this.stepsBySequenceName[sequenceName] as SequenceDeclaration;
-        const previousPosition = this.stepPositionInSequence;
-
-        if (flagName) {
-          this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
-        } else {
-          this.stepPositionInSequence = 0;
-        }
-
-        this.pushSequence({name: sequenceName, steps: steps.steps});
-
-        this.nextStep({
-          ...stepArguments,
-          onEnded: () => {
-            this.popSequenceAndRefreshCurrent();
-            this.stepPositionInSequence = previousPosition + 1;
-            this.nextStep(stepArguments);
-          }
-        });
-      } else {
-        this.advance(stepArguments);
-      }
+      this.readSequenceRef(step.innerSequence.content, stepArguments);
     } else if (step.innerSequence.content.kind === InstructionKind.SequenceOperation) {
       this.readSequenceOrOperation(step.innerSequence.content, stepArguments, '(op)');
+    } else if (step.innerSequence.content.kind === InstructionKind.TernaryInstruction) {
+      this.readSequenceOrOperation(step.innerSequence.content, stepArguments, '?');
+    }
+  }
+
+  private readSequenceRef(ref: SequenceRef, stepArguments: StepArguments) {
+    const {sequenceName, flagName} = ref;
+
+    if (this.stepsBySequenceName[sequenceName] != null && !isPrimitive(this.stepsBySequenceName[sequenceName])) {
+      const steps = this.stepsBySequenceName[sequenceName] as SequenceDeclaration;
+      const previousPosition = this.stepPositionInSequence;
+
+      if (flagName) {
+        this.stepPositionInSequence = this.findFlagPosition(flagName, this.currentSequence)
+      } else {
+        this.stepPositionInSequence = 0;
+      }
+
+      this.pushSequence({name: sequenceName, steps: steps.steps});
+
+      this.nextStep({
+        ...stepArguments,
+        onEnded: () => {
+          this.popSequenceAndRefreshCurrent();
+          this.stepPositionInSequence = previousPosition + 1;
+          this.nextStep(stepArguments);
+        }
+      });
+    } else {
+      this.advance(stepArguments);
     }
   }
 
@@ -460,6 +473,20 @@ class PlayHead {
     }
 
     this.advance(stepArguments);
+  }
+
+  private readTernary(maybeSequence: TernaryInstruction, stepArguments: StepArguments, name: string) {
+    const wrappedArgs = {
+      ...stepArguments,
+      onEnded: () => {
+        this.advance(stepArguments);
+      }
+    }
+    if (maybeSequence.condition) {
+      this.readSequenceOrOperation(maybeSequence.ifBranch, wrappedArgs, name);
+    } else {
+      this.readSequenceOrOperation(maybeSequence.elseBranch, wrappedArgs, name);
+    }
   }
 }
 
