@@ -56,6 +56,7 @@ export class MidiPlayer {
   }
 
   public static play(codeProvider: CodeProvider,
+                     entryPointName: string,
                      output: MidiOutput,
                      onEnded: Function,
                      onStepPlay: StepPlayCallback,
@@ -66,15 +67,15 @@ export class MidiPlayer {
       }
     }
     const player = new MidiPlayer(codeProvider, output, errorReporter);
-    player.doPlay(onEnded, onStepPlay);
+    player.doPlay(entryPointName, onEnded, onStepPlay);
   }
 
-  private doPlay(onEnded: Function, onStepPlay: StepPlayCallback): void {
+  private doPlay(entryPointName: string, onEnded: Function, onStepPlay: StepPlayCallback): void {
     this.reinterpretCode();
 
     if (this.latestInterpretedCode) {
       try {
-        this.playHead = PlayHead.createAtRoot(this, 'Root', {
+        this.playHead = PlayHead.createAtRoot(this, entryPointName, {
           onEnded: () => {
             this.output.allSoundOff();
             onEnded();

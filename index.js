@@ -54,6 +54,7 @@ const errorReporter = {
 
 let foundFile;
 let foundOutput;
+let foundEntry;
 const codeSource = {};
 main();
 
@@ -62,6 +63,7 @@ async function main() {
     .version(pjson.version)
     .option('-f, --file [file]', 'File to read from')
     .option('-o, --output [output]', 'Midi output port to use')
+    .option('-e, --entry [entry]', 'The program\'s entry point')
     .action(async options => {
       const parsed = parseInt(options.output);
       foundOutput = (isNaN(parsed) || parsed < 0 || parsed > output.getPortCount()) ? null : parsed;
@@ -91,6 +93,17 @@ async function main() {
           });
       }
 
+      foundEntry = options.entry;
+
+      while (foundEntry == null) {
+        await inquirer.prompt([{type: 'input', name: 'entry', message: 'Which entry point'}])
+          .then(answers => {
+            if (answers.entry.trim().length > 0) {
+              foundEntry = answers.entry.trim();
+            }
+          });
+      }
+
       chokidar
         .watch(foundFile)
         .on('change', () => {
@@ -105,7 +118,7 @@ async function main() {
 
 function runProgram() {
   codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.play(codeSource, new MidiOutput(output), onProgramEnded, onStepPlayed, errorReporter);
+  Player.play(codeSource, foundEntry, new MidiOutput(output), onProgramEnded, onStepPlayed, errorReporter);
 }
 
 function printAvailableMidiOutputDevices() {
