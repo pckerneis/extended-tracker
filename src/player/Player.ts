@@ -62,7 +62,6 @@ export class Head {
     if (this._nextTime > time
       || this._currentSequence == null
       || this._currentStepIndex >= this._currentSequence.expressions.length) {
-      console.log('exit for time ' + time)
       return false;
     }
 
@@ -139,10 +138,14 @@ export class Head {
 }
 
 export class Player {
-  private _scheduler: Scheduler = new Scheduler();
   private _speed: number = 1;
   private _latestEvaluatedCode: string;
   private _exprs: Expr[];
+
+  private _head: Head;
+  private _startTime: number;
+  private _lookAhead: number = 0.1;
+  private _ended: boolean;
 
   set speed(speed: number) {
     if (!isNaN(speed) && speed > 0) {
@@ -166,22 +169,37 @@ export class Player {
     return this._speed;
   }
 
-  private constructor(private readonly codeProvider: CodeProvider) {
+  private constructor(private readonly codeProvider: CodeProvider,
+                      private readonly clock: () => number) {
   }
 
-  public static read(codeProvider: CodeProvider, entryPoint: string): void {
-    const player = new Player(codeProvider);
+  public static read(codeProvider: CodeProvider, entryPoint: string, clock: () => number = defaultClock): void {
+    const player = new Player(codeProvider, clock);
     player.start(entryPoint);
   }
 
   private start(entryPoint: string): void {
-    const head = new Head(this, { post: (t, message) => console.log(t, message) });
-    head.start(entryPoint, 0, 1, () => console.log('ended'));
+    this._head = new Head(this, { post: (t, message) => console.log(t, message) });
+    this._head.start(entryPoint, 0, 1, () => {
+      console.log('ended');
+      this._ended = true;
+    });
 
-    while(head.next(10)) {}
+    this._startTime = this.clock();
+    this.next();
+  }
+
+  private next(): void {
+    const now = this.clock() - this._startTime;
+    while(this._head.next(now + this._lookAhead)) {}
+
+    if (! this._ended) {
+      setTimeout(() => this.next(), 10);
+    } else {
+      this._head = null;
+    }
   }
 }
-
 
 function evaluateLogical(expr: Logical, env: any): null | any {
   const left = evaluateAsPrimitive(expr.left, env);
@@ -262,4 +280,10 @@ function evaluateTernaryCondition(expr: TernaryCondition, env: any): null | any 
   } else {
     return evaluateAsPrimitive(expr.elseBranch, env)
   }
+}
+
+const { performance } = require('perf_hooks');
+
+export function defaultClock(): number {
+  return performance.now() / 1000;
 }
