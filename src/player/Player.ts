@@ -1,4 +1,3 @@
-import {Scheduler} from '../scheduler/Scheduler';
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
 import {
@@ -13,7 +12,8 @@ import {
   TernaryCondition,
   TrackList
 } from '../parser/Ast';
-import {TokenType} from '../scanner/Tokens';
+import {Token, TokenType} from '../scanner/Tokens';
+import {EventQueue} from '../scheduler/EventQueue';
 
 export interface CodeProvider {
   code: string;
@@ -25,52 +25,39 @@ interface MessageOutlet {
 
 export class Head {
 
-  // private _next: Expr;
   private _currentSequence: Sequence;
   private _currentStepIndex: number;
   private _ended: Function;
   private _nextTime: number;
   private _stepLength: number;
 
-  // TODO Construct with static method, lock constructor...
-  constructor(public readonly player: Player,
+  private constructor(public readonly player: Player,
               public readonly messageOutlet: MessageOutlet) {
   }
 
-  public start(sequenceName: string, nextTime: number, stepLength: number, ended: Function): void {
-    this._nextTime = nextTime;
-    this._ended = ended;
-    this._stepLength = stepLength;
+  public static start(player: Player,
+                      messageOutlet: MessageOutlet,
+                      sequenceName: string,
+                      stepLength: number,
+                      ended: Function): void {
+    const head = new Head(player, messageOutlet);
+    head._nextTime = 0;
+    head._ended = ended;
+    head._stepLength = stepLength;
 
-    const match = this.findDeclaration(sequenceName);
+    const match = head.findDeclaration(sequenceName);
 
-    if (match) {
-      switch (match.value.kind) {
-        case AstNodeKind.SEQUENCE:
-          this._currentSequence = match.value;
-          this._currentStepIndex = -1;
-          break;
-        default:
-          throw new Error('Not a sequence.');
-      }
-    } else {
+    if (! match) {
       throw new Error('Cannot find entry point.');
     }
-  }
 
-  public next(time: number): boolean {
-    if (this._nextTime > time
-      || this._currentSequence == null
-      || this._currentStepIndex >= this._currentSequence.expressions.length) {
-      return false;
-    }
-
-    this.readNextStep();
-    return true;
+    head.readRootSequence(sequenceName);
   }
 
   private wait(): void {
     this._nextTime += this._stepLength;
+
+    this.player.schedule(this._nextTime, () => this.readNextStep());
   }
 
   private findDeclaration(name: string): Assign {
@@ -100,6 +87,9 @@ export class Head {
       case AstNodeKind.JUMP:
         this.jump(step);
         break;
+      case AstNodeKind.INNER_SEQUENCE:
+        this.readSequence(step.maybeSequence);
+        break;
       default:
         this.readNextStep();
     }
@@ -122,7 +112,9 @@ export class Head {
   }
 
   private jump(jump: Jump): void {
-    // TODO outer flag
+    // Sequence name is either provided or the current root one
+
+    // Resolve
 
     // TODO "recursive search"
     const flag = this._currentSequence.expressions.find(step => step.kind === AstNodeKind.FLAG
@@ -130,10 +122,99 @@ export class Head {
 
     if (flag != null) {
       this._currentStepIndex = this._currentSequence.expressions.indexOf(flag);
-      console.log('jump to ' + jump.flag.lexeme);
+      // console.log('jump to ' + jump.flag.lexeme);
     }
 
     this.readNextStep();
+  }
+
+  private readRootSequence(name: string): void {
+    const match = this.findDeclaration(name);
+
+    if (match) {
+      this.readSequence(match.value);
+    }
+  }
+
+  private readSequence(expr: Expr): void {
+    switch (expr.kind) {
+      case AstNodeKind.VARIABLE:
+        this.readRootSequence(expr.name.lexeme);
+        break;
+      case AstNodeKind.SEQUENCE:
+        this._currentSequence = expr;
+        this._currentStepIndex = -1;
+        this.readNextStep();
+        break;
+      case AstNodeKind.BINARY:
+      case AstNodeKind.LOGICAL:
+        this.readSequenceOperation(expr.left, expr.right, expr.operator);
+        break;
+    }
+  }
+
+  private readSequenceOperation(left: Expr, right: Expr, operator: Token): void {
+    switch (operator.type) {
+      case TokenType.AMPERSAND:
+        return this.readAll(left, right);
+      case TokenType.DOUBLE_PIPE:
+        return this.readAny(left, right);
+    }
+  }
+
+  private readAll(left: Expr, right: Expr): void {
+    let leftEnded = false;
+    let rightEnded = false;
+
+    const leftHead = Head.nested(this, left, () => {
+      leftEnded = true;
+
+      if (rightEnded) {
+        this._nextTime = leftHead._nextTime;
+        this.readNextStep();
+      }
+    });
+
+    const rightHead = Head.nested(this, right, () => {
+      rightEnded = true;
+
+      if (leftEnded) {
+        this._nextTime = rightHead._nextTime;
+        this.readNextStep();
+      }
+    });
+  }
+
+  private readAny(left: Expr, right: Expr): void {
+    let leftEnded = false;
+    let rightEnded = false;
+
+    const leftHead = Head.nested(this, left, () => {
+      leftEnded = true;
+
+      if (! rightEnded) {
+        this._nextTime = leftHead._nextTime;
+        this.readNextStep();
+      }
+    });
+
+    const rightHead = Head.nested(this, right, () => {
+      rightEnded = true;
+
+      if (! leftEnded) {
+        this._nextTime = rightHead._nextTime;
+        this.readNextStep();
+      }
+    });
+  }
+
+  private static nested(parent: Head, expr: Expr, ended: () => void): Head {
+    const head = new Head(parent.player, parent.messageOutlet);
+    head._nextTime = parent._nextTime;
+    head._stepLength = parent._stepLength;
+    head._ended = ended;
+    head.readSequence(expr);
+    return head;
   }
 }
 
@@ -146,6 +227,8 @@ export class Player {
   private _startTime: number;
   private _lookAhead: number = 0.1;
   private _ended: boolean;
+
+  private readonly _eventQueue = new EventQueue<Function>();
 
   set speed(speed: number) {
     if (!isNaN(speed) && speed > 0) {
@@ -179,8 +262,8 @@ export class Player {
   }
 
   private start(entryPoint: string): void {
-    this._head = new Head(this, { post: (t, message) => console.log(t, message) });
-    this._head.start(entryPoint, 0, 1, () => {
+    Head.start(this, { post: (t, message) => console.log(t, message) },
+      entryPoint, 1, () => {
       console.log('ended');
       this._ended = true;
     });
@@ -191,13 +274,25 @@ export class Player {
 
   private next(): void {
     const now = this.clock() - this._startTime;
-    while(this._head.next(now + this._lookAhead)) {}
+    let next: Function;
+
+    do {
+      next = this._eventQueue.next(now + this._lookAhead)?.event;
+
+      if (next) {
+        next();
+      }
+    } while (next);
 
     if (! this._ended) {
       setTimeout(() => this.next(), 10);
     } else {
       this._head = null;
     }
+  }
+
+  schedule(when: number, what: () => void): void {
+    this._eventQueue.add(when, what);
   }
 }
 
