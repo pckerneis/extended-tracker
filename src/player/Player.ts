@@ -20,27 +20,27 @@ export interface CodeProvider {
 }
 
 interface MessageOutlet {
-  post(time: number, message: any): void;
+  post(time: number, headId: string, messages: any[]): void;
 }
 
 export class Head {
-
   private _currentSequence: Sequence;
   private _currentStepIndex: number;
   private _ended: Function;
   private _nextTime: number;
   private _stepLength: number;
 
-  private constructor(public readonly player: Player,
-              public readonly messageOutlet: MessageOutlet) {
+  private constructor(public readonly id: string,
+                      public readonly player: BasePlayer,
+                      public readonly messageOutlet: MessageOutlet) {
   }
 
-  public static start(player: Player,
+  public static start(player: BasePlayer,
                       messageOutlet: MessageOutlet,
                       sequenceName: string,
                       stepLength: number,
                       ended: Function): void {
-    const head = new Head(player, messageOutlet);
+    const head = new Head('root', player, messageOutlet);
     head._nextTime = 0;
     head._ended = ended;
     head._stepLength = stepLength;
@@ -96,7 +96,7 @@ export class Head {
   }
 
   private readTracks(step: TrackList): void {
-    step.tracks.forEach(track => {
+    const messages = step.tracks.map(track => {
       const message = {};
 
       if (track.kind === AstNodeKind.PARAMS) {
@@ -107,22 +107,19 @@ export class Head {
         });
       }
 
-      this.messageOutlet.post(this._nextTime, message);
+      return message;
     });
+
+    this.messageOutlet.post(this._nextTime, this.id, messages);
   }
 
   private jump(jump: Jump): void {
-    // Sequence name is either provided or the current root one
-
-    // Resolve
-
-    // TODO "recursive search"
+    // TODO "recursive search" ?
     const flag = this._currentSequence.expressions.find(step => step.kind === AstNodeKind.FLAG
       &&  step.name.lexeme === jump.flag.lexeme);
 
     if (flag != null) {
       this._currentStepIndex = this._currentSequence.expressions.indexOf(flag);
-      // console.log('jump to ' + jump.flag.lexeme);
     }
 
     this.readNextStep();
@@ -166,7 +163,7 @@ export class Head {
     let leftEnded = false;
     let rightEnded = false;
 
-    const leftHead = Head.nested(this, left, () => {
+    const leftHead = Head.nested('left', this, left, () => {
       leftEnded = true;
 
       if (rightEnded) {
@@ -175,7 +172,7 @@ export class Head {
       }
     });
 
-    const rightHead = Head.nested(this, right, () => {
+    const rightHead = Head.nested('right', this, right, () => {
       rightEnded = true;
 
       if (leftEnded) {
@@ -189,7 +186,7 @@ export class Head {
     let leftEnded = false;
     let rightEnded = false;
 
-    const leftHead = Head.nested(this, left, () => {
+    const leftHead = Head.nested('left', this, left, () => {
       leftEnded = true;
 
       if (! rightEnded) {
@@ -198,7 +195,7 @@ export class Head {
       }
     });
 
-    const rightHead = Head.nested(this, right, () => {
+    const rightHead = Head.nested('right', this, right, () => {
       rightEnded = true;
 
       if (! leftEnded) {
@@ -208,8 +205,8 @@ export class Head {
     });
   }
 
-  private static nested(parent: Head, expr: Expr, ended: () => void): Head {
-    const head = new Head(parent.player, parent.messageOutlet);
+  private static nested(id: string, parent: Head, expr: Expr, ended: () => void): Head {
+    const head = new Head(`${parent.id}/${id}`, parent.player, parent.messageOutlet);
     head._nextTime = parent._nextTime;
     head._stepLength = parent._stepLength;
     head._ended = ended;
@@ -218,16 +215,15 @@ export class Head {
   }
 }
 
-export class Player {
+export class BasePlayer {
+
+  protected _lookAhead: number = 0.1;
+
   private _speed: number = 1;
   private _latestEvaluatedCode: string;
   private _exprs: Expr[];
-
-  private _head: Head;
   private _startTime: number;
-  private _lookAhead: number = 0.1;
   private _ended: boolean;
-
   private readonly _eventQueue = new EventQueue<Function>();
 
   set speed(speed: number) {
@@ -252,21 +248,16 @@ export class Player {
     return this._speed;
   }
 
-  private constructor(private readonly codeProvider: CodeProvider,
-                      private readonly clock: () => number) {
+  protected constructor(private readonly codeProvider: CodeProvider,
+                        private readonly clock: () => number) {
   }
 
-  public static read(codeProvider: CodeProvider, entryPoint: string, clock: () => number = defaultClock): void {
-    const player = new Player(codeProvider, clock);
-    player.start(entryPoint);
-  }
-
-  private start(entryPoint: string): void {
-    Head.start(this, { post: (t, message) => console.log(t, message) },
+  protected start(entryPoint: string, messageOutlet: MessageOutlet, onEnded: Function): void {
+    Head.start(this, messageOutlet,
       entryPoint, 1, () => {
-      console.log('ended');
-      this._ended = true;
-    });
+        console.log('ended');
+        this._ended = true;
+      });
 
     this._startTime = this.clock();
     this.next();
@@ -286,13 +277,24 @@ export class Player {
 
     if (! this._ended) {
       setTimeout(() => this.next(), 10);
-    } else {
-      this._head = null;
     }
   }
 
-  schedule(when: number, what: () => void): void {
+  public schedule(when: number, what: () => void): void {
     this._eventQueue.add(when, what);
+  }
+}
+
+export class PrintPlayer extends BasePlayer {
+  constructor(codeProvider: CodeProvider, clock: () => number) {
+    super(codeProvider, clock);
+  }
+
+  public static read(codeProvider: CodeProvider, entryPoint: string, clock: () => number = defaultClock): void {
+    const player = new PrintPlayer(codeProvider, clock);
+    player.start(entryPoint,
+      { post: (t, head, message) => console.log(t, head, message) },
+      () => console.log('Ended'));
   }
 }
 

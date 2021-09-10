@@ -1,96 +1,102 @@
-// import {Interpreter, Program} from '../interpreter/Interpreter';
-// import {MidiOutput} from '../midi/MidiOutput';
-// import {ErrorReporter} from '../error/ErrorReporter';
-// import {Scheduler} from '../scheduler/Scheduler';
-// import {PlayHead, StepPlayCallback} from './PlayHead';
-//
-// export interface CodeProvider {
-//   code: string;
-// }
-//
-// export class MidiPlayer {
-//
-//   private _program: Program;
-//   private _scheduler: Scheduler = new Scheduler();
-//   private playHead: PlayHead;
-//   private latestInterpretedCode: string;
-//   private _speed: number = 1;
-//
-//   set speed(speed: number) {
-//     if (!isNaN(speed) && speed > 0) {
-//       this._speed = speed;
-//     } else {
-//       // TODO use error reporter?
-//       console.error('Wrong speed value ' + speed);
-//     }
-//   }
-//
-//   get speed(): number {
-//     return this._speed;
-//   }
-//
-//   public get scheduler(): Scheduler {
-//     return this._scheduler;
-//   }
-//
-//   public get program(): Program {
-//     return this._program;
-//   }
-//
-//   private constructor(public readonly codeProvider: CodeProvider,
-//                       public readonly output: MidiOutput,
-//                       public readonly errorReporter: ErrorReporter) {
-//   }
-//
-//   public static play(codeProvider: CodeProvider,
-//                      entryPointName: string,
-//                      output: MidiOutput,
-//                      onEnded: Function,
-//                      onStepPlay: StepPlayCallback,
-//                      errorReporter?: ErrorReporter): void {
-//     if (errorReporter == null) {
-//       errorReporter = {
-//         reportError: (...args: any[]) => console.error(args),
-//       }
-//     }
-//     const player = new MidiPlayer(codeProvider, output, errorReporter);
-//     player.doPlay(entryPointName, onEnded, onStepPlay);
-//   }
-//
-//   private doPlay(entryPointName: string, onEnded: Function, onStepPlay: StepPlayCallback): void {
-//     this.reinterpretCode();
-//
-//     if (this.latestInterpretedCode) {
-//       try {
-//         this.playHead = PlayHead.createAtRoot(this, entryPointName, {
-//           onEnded: () => {
-//             this.output.allSoundOff();
-//             onEnded();
-//           }, onStepPlay
-//         }, 0.25, 0);
-//         this._scheduler.start();
-//       } catch (e) {
-//         this.errorReporter.reportError(e);
-//         onEnded();
-//       }
-//     } else {
-//       onEnded();
-//     }
-//   }
-//
-//   public reinterpretCode(): void {
-//     const code = this.codeProvider.code;
-//
-//     if (code !== this.latestInterpretedCode) {
-//       const newProgram = Interpreter.interpret(this.codeProvider.code, this.errorReporter);
-//
-//       if (newProgram != null) {
-//         console.log('Program interpreted')
-//         this._program = newProgram;
-//         this.latestInterpretedCode = code;
-//       } else {
-//         console.error('Program could not be interpreted.');
-//       }
-//     }
-//   }
-// }
+import {MidiOutput} from '../midi/MidiOutput';
+import {BasePlayer, defaultClock} from './Player';
+
+export interface CodeProvider {
+  code: string;
+}
+
+export class MidiPlayer extends BasePlayer {
+  private heads = new Map<string, Track[]>();
+
+  constructor(codeProvider: CodeProvider,
+              clock: () => number,
+              public readonly output: MidiOutput) {
+    super(codeProvider, clock);
+  }
+
+  public static read(codeProvider: CodeProvider,
+                     entryPoint: string,
+                     output: MidiOutput,
+                     clock: () => number = defaultClock): void {
+    const player = new MidiPlayer(codeProvider, clock, output);
+    player.start(entryPoint,
+      { post: (t, head, messages) => player.processMessages(t, head, messages) },
+      () => console.log('Ended'));
+  }
+
+  private processMessages(time: number, headId: string, messages: any[]) {
+    let tracks: Track[] = this.heads.get(headId);
+
+    if (tracks == null) {
+      tracks = [];
+      this.heads.set(headId, tracks);
+    }
+
+    messages.forEach((message, index) => {
+      let {p, v, i, c} = message;
+
+      const trackIndex = i ?? index;
+      let track: Track = tracks[trackIndex];
+
+      if (track == null) {
+        track = new Track(this.output);
+        tracks[trackIndex] = track;
+      }
+
+      if (message.silent) {
+        track.silence();
+      } else if (!isNaN(p) && p >= 0 && p < 128) {
+        track.noteOn(p, v, c);
+      } else if (v != null) {
+        track.velocityChange(v);
+      }
+    });
+  }
+}
+
+class Track {
+  private _latestVelocity = 0;
+  private _pendingPitch: number;
+  private _pendingChannel: number;
+  private _latestChannel: number;
+
+  constructor(public readonly output: MidiOutput) {
+  }
+
+  noteOn(pitch: number, velocity?: number, channel?: number) {
+    this.endPendingNote();
+
+    if (velocity != null) {
+      velocity = Math.min(Math.max(0, velocity), 127);
+      this._latestVelocity = velocity;
+    } else {
+      velocity = this._latestVelocity;
+    }
+
+    channel = channel ?? this._latestChannel ?? 0;
+
+    this.output.noteOn(pitch, velocity, channel);
+    this._pendingPitch = pitch;
+    this._pendingChannel = channel;
+    this._latestChannel = channel;
+  }
+
+  silence() {
+    this.endPendingNote();
+  }
+
+  velocityChange(velocity: number) {
+    if (!isNaN(velocity)) {
+      velocity = Math.min(Math.max(0, velocity), 127);
+      this._latestVelocity = velocity;
+    }
+  }
+
+  private endPendingNote(): void {
+    if (this._pendingPitch != null) {
+      this.output.noteOff(this._pendingPitch, 0, this._pendingChannel);
+      this._pendingPitch = null;
+      this._pendingChannel = null;
+    }
+  }
+}
