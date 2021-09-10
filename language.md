@@ -8,17 +8,6 @@ Comments allow increasing code readability, but they have no impact on code.
 // This is a comment
 ```
 
-## Messages
-
-A variable can store a message which is a list of params between curly brackets.
-
-Most common params are p (pitch) and v (velocity) both ranging from 0 to 127.
-
-```
-k = {p:36, v:80}
-s = {p:38, v:80}
-```
-
 ## Numbers
 
 Variables can store integer and floating-point numbers. All numbers are represented as single precision floats internally.
@@ -79,10 +68,6 @@ seq = [
 ]
 ```
 
-### Silent step
-
-A step is "silent" if it begins with "-".
-
 ### Inline sequences
 
 Inline sequence steps with ";" separator.
@@ -99,19 +84,17 @@ seq = [ k ; - ; k|s ; - ; k ; - ; k|s ; - ]
 Sequences can be nested inside another. They are played one at the time.
 
 ```
-k = {p:36, v:80} // kick
-s = {p:38, v:80} // snare
-
 seqA = [
-    k
+    p:36, v:80
     -
-    k|s
+    p:38, v:80
     -
 ]
 
 seqB = [ 
     {seqA}
     p: 12 | p: 14
+    -
     {seqA} 
 ]
 ```

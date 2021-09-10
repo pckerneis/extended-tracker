@@ -5,8 +5,7 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const midi = require('midi');
 const chokidar = require('chokidar');
-const Player = require('./dist/player/MidiPlayer').MidiPlayer;
-const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
+const Player = require('./dist/player/Player').Player;
 const {formatTime} = require('./dist/utils/time');
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
@@ -118,7 +117,7 @@ async function main() {
 
 function runProgram() {
   codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.play(codeSource, foundEntry, new MidiOutput(output), onProgramEnded, onStepPlayed, errorReporter);
+  Player.read(codeSource, foundEntry);
 }
 
 function printAvailableMidiOutputDevices() {

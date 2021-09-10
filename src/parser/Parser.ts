@@ -22,7 +22,7 @@ export class Parser {
 
   private readonly controlMessageToken = TokenType.DOLLAR;
 
-  constructor(public readonly tokens: Token[]) {
+  private constructor(public readonly tokens: Token[]) {
   }
 
   public static parse(tokens: Token[]): Expr[] {
