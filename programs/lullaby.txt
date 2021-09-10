@@ -42,10 +42,8 @@ Chords = [
     ,
 ]
 
-melodyVel = 60
-
 MelodyA = [
-    p: 71, v: melodyVel, c: 2
+    p: 71, v: 50, c: 2
     ,
     ,
     ,
@@ -72,7 +70,7 @@ MelodyA = [
 ]
 
 MelodyB = [
-    p: 71, v: melodyVel, c: 2
+    p: 71, v: 50, c: 2
     ,
     ,
     ,
@@ -87,7 +85,7 @@ MelodyB = [
 ]
 
 MelodyC1 = [
-    p: 74, v: melodyVel, c: 2
+    p: 74, v: 50, c: 2
     ,
     ,
     ,
@@ -102,7 +100,7 @@ MelodyC1 = [
 ]
 
 MelodyC2 = [
-    p: 86, v: melodyVel, c: 2
+    p: 86, v: 50, c: 2
     ,
     ,
     ,
@@ -117,7 +115,7 @@ MelodyC2 = [
 ]
 
 MelodyA_var = [
-    p: 70, v: melodyVel, c: 2
+    p: 70, v: 50, c: 2
     ,
     ,
     ,
@@ -144,7 +142,7 @@ MelodyA_var = [
 ]
 
 Melody = [
-    {randf() > 0.5 ? MelodyA : [ - ; {MelodyA_var}; ]}
+    {MelodyA}
     {MelodyB || [ - ; {MelodyB}]}
     {MelodyC1}
     {false ? [] : MelodyA_var}

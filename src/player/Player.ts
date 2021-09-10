@@ -19,10 +19,6 @@ export interface CodeProvider {
   code: string;
 }
 
-interface MessageOutlet {
-  post(time: number, headId: string, messages: any[]): void;
-}
-
 export class Head {
   private _currentSequence: Sequence;
   private _currentStepIndex: number;
@@ -31,27 +27,26 @@ export class Head {
   private _stepLength: number;
 
   private constructor(public readonly id: string,
-                      public readonly player: BasePlayer,
-                      public readonly messageOutlet: MessageOutlet) {
+                      public readonly player: BasePlayer) {
   }
 
   public static start(player: BasePlayer,
-                      messageOutlet: MessageOutlet,
                       sequenceName: string,
                       stepLength: number,
-                      ended: Function): void {
-    const head = new Head('root', player, messageOutlet);
+                      ended: Function): Head {
+    const head = new Head('root', player);
     head._nextTime = 0;
     head._ended = ended;
     head._stepLength = stepLength;
 
     const match = head.findDeclaration(sequenceName);
 
-    if (! match) {
+    if (!match) {
       throw new Error('Cannot find entry point.');
     }
 
     head.readRootSequence(sequenceName);
+    return head;
   }
 
   private wait(): void {
@@ -67,14 +62,14 @@ export class Head {
 
   private readNextStep(): void {
     if (!this._currentSequence) {
-      this._ended();
+      this.end();
       return;
     }
 
     this._currentStepIndex++;
 
     if (this._currentStepIndex >= this._currentSequence.expressions.length) {
-      this._ended();
+      this.end();
       return;
     }
     const step = this._currentSequence.expressions[this._currentStepIndex];
@@ -88,7 +83,7 @@ export class Head {
         this.jump(step);
         break;
       case AstNodeKind.INNER_SEQUENCE:
-        this.readSequence(step.maybeSequence);
+        this.innerSequence(step.maybeSequence);
         break;
       default:
         this.readNextStep();
@@ -110,13 +105,14 @@ export class Head {
       return message;
     });
 
-    this.messageOutlet.post(this._nextTime, this.id, messages);
+    this.player.post(this._nextTime, this.id, messages);
   }
 
   private jump(jump: Jump): void {
+    // TODO Outer jump (what is the flag scope ? what if more than 1 ? what if in inner ?)
     // TODO "recursive search" ?
     const flag = this._currentSequence.expressions.find(step => step.kind === AstNodeKind.FLAG
-      &&  step.name.lexeme === jump.flag.lexeme);
+      && step.name.lexeme === jump.flag.lexeme);
 
     if (flag != null) {
       this._currentStepIndex = this._currentSequence.expressions.indexOf(flag);
@@ -189,7 +185,7 @@ export class Head {
     const leftHead = Head.nested('left', this, left, () => {
       leftEnded = true;
 
-      if (! rightEnded) {
+      if (!rightEnded) {
         this._nextTime = leftHead._nextTime;
         this.readNextStep();
       }
@@ -198,7 +194,7 @@ export class Head {
     const rightHead = Head.nested('right', this, right, () => {
       rightEnded = true;
 
-      if (! leftEnded) {
+      if (!leftEnded) {
         this._nextTime = rightHead._nextTime;
         this.readNextStep();
       }
@@ -206,33 +202,46 @@ export class Head {
   }
 
   private static nested(id: string, parent: Head, expr: Expr, ended: () => void): Head {
-    const head = new Head(`${parent.id}/${id}`, parent.player, parent.messageOutlet);
+    const head = new Head(`${parent.id}/${id}`, parent.player);
     head._nextTime = parent._nextTime;
     head._stepLength = parent._stepLength;
     head._ended = ended;
     head.readSequence(expr);
     return head;
   }
+
+  private innerSequence(maybeSequence: Expr): void {
+    const nested = Head.nested('nested', this, maybeSequence, () => {
+      this._nextTime = nested._nextTime;
+      this.readNextStep();
+    });
+  }
+
+  private end(): void {
+    this.player.processors.filter(p => typeof p.headEnded === 'function')
+      .forEach(processor => processor.headEnded(this.id));
+    this._ended();
+  }
+}
+
+export interface MessageProcessor {
+  process?: (time: number, headId: string, messages: any[]) => void;
+  headEnded?: (headId: string) => void;
+  ended?: () => void;
 }
 
 export class BasePlayer {
-
   protected _lookAhead: number = 0.1;
 
-  private _speed: number = 1;
   private _latestEvaluatedCode: string;
   private _exprs: Expr[];
   private _startTime: number;
-  private _ended: boolean;
+  private _hasReachedEnd: boolean;
   private readonly _eventQueue = new EventQueue<Function>();
+  private _messageProcessors: MessageProcessor[] = [];
 
-  set speed(speed: number) {
-    if (!isNaN(speed) && speed > 0) {
-      this._speed = speed;
-    } else {
-      // TODO use error reporter?
-      console.error('Wrong speed value ' + speed);
-    }
+  public get processors(): MessageProcessor[] {
+    return this._messageProcessors;
   }
 
   public get expressions(): Expr[] {
@@ -244,19 +253,28 @@ export class BasePlayer {
     return this._exprs;
   }
 
-  get speed(): number {
-    return this._speed;
-  }
-
   protected constructor(private readonly codeProvider: CodeProvider,
                         private readonly clock: () => number) {
   }
 
-  protected start(entryPoint: string, messageOutlet: MessageOutlet, onEnded: Function): void {
-    Head.start(this, messageOutlet,
-      entryPoint, 1, () => {
-        console.log('ended');
-        this._ended = true;
+  static read(codeProvider: CodeProvider,
+              entryPoint: string,
+              processors: MessageProcessor[]) {
+    const player = new BasePlayer(codeProvider, defaultClock);
+    player._messageProcessors = processors;
+    player.start(entryPoint);
+  }
+
+  protected start(entryPoint: string): void {
+    Head.start(this,
+      entryPoint,
+      1,
+      () => {
+        this._messageProcessors
+          .filter(processor => typeof processor.ended === 'function')
+          .forEach(processor => processor.ended());
+
+        this._hasReachedEnd = true;
       });
 
     this._startTime = this.clock();
@@ -275,7 +293,7 @@ export class BasePlayer {
       }
     } while (next);
 
-    if (! this._ended) {
+    if (!this._hasReachedEnd) {
       setTimeout(() => this.next(), 10);
     }
   }
@@ -283,18 +301,21 @@ export class BasePlayer {
   public schedule(when: number, what: () => void): void {
     this._eventQueue.add(when, what);
   }
+
+  public post(time: number, headId: string, messages: any[]): void {
+    this._messageProcessors
+      .filter(processor => typeof processor.process === 'function')
+      .forEach(processor => processor.process(time, headId, messages));
+  }
 }
 
-export class PrintPlayer extends BasePlayer {
-  constructor(codeProvider: CodeProvider, clock: () => number) {
-    super(codeProvider, clock);
+export class PrintProcessor implements MessageProcessor {
+  ended(): void {
+    console.log('Ended');
   }
 
-  public static read(codeProvider: CodeProvider, entryPoint: string, clock: () => number = defaultClock): void {
-    const player = new PrintPlayer(codeProvider, clock);
-    player.start(entryPoint,
-      { post: (t, head, message) => console.log(t, head, message) },
-      () => console.log('Ended'));
+  process(time: number, headId: string, messages: any[]): void {
+    console.log(time, headId, messages);
   }
 }
 
@@ -379,7 +400,7 @@ function evaluateTernaryCondition(expr: TernaryCondition, env: any): null | any 
   }
 }
 
-const { performance } = require('perf_hooks');
+const {performance} = require('perf_hooks');
 
 export function defaultClock(): number {
   return performance.now() / 1000;

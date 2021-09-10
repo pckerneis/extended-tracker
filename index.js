@@ -1,3 +1,4 @@
+
 const chalk = require('chalk');
 const pjson = require('./package.json');
 const commander = require('commander');
@@ -6,7 +7,9 @@ const fs = require('fs');
 const midi = require('midi');
 const chokidar = require('chokidar');
 const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
-const Player = require('./dist/player/MidiPlayer').MidiPlayer;
+const MidiProcessor = require('./dist/player/MidiProcessor').MidiProcessor;
+const PrintProcessor = require('./dist/player/Player').PrintProcessor;
+const Player = require('./dist/player/Player').BasePlayer;
 const {formatTime} = require('./dist/utils/time');
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
@@ -118,7 +121,11 @@ async function main() {
 
 function runProgram() {
   codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.read(codeSource, foundEntry, new MidiOutput(output));
+  Player.read(codeSource, foundEntry, [
+    new MidiProcessor(new MidiOutput(output)),
+    new PrintProcessor(),
+    { ended: () => onProgramEnded(), process: () => {} }
+  ]);
 }
 
 function printAvailableMidiOutputDevices() {

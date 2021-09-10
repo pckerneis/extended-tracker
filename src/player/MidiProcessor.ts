@@ -1,30 +1,12 @@
 import {MidiOutput} from '../midi/MidiOutput';
-import {BasePlayer, defaultClock} from './Player';
+import {MessageProcessor} from './Player';
 
-export interface CodeProvider {
-  code: string;
-}
-
-export class MidiPlayer extends BasePlayer {
+export class MidiProcessor implements MessageProcessor {
   private heads = new Map<string, Track[]>();
 
-  constructor(codeProvider: CodeProvider,
-              clock: () => number,
-              public readonly output: MidiOutput) {
-    super(codeProvider, clock);
-  }
+  constructor(public readonly output: MidiOutput) {}
 
-  public static read(codeProvider: CodeProvider,
-                     entryPoint: string,
-                     output: MidiOutput,
-                     clock: () => number = defaultClock): void {
-    const player = new MidiPlayer(codeProvider, clock, output);
-    player.start(entryPoint,
-      { post: (t, head, messages) => player.processMessages(t, head, messages) },
-      () => console.log('Ended'));
-  }
-
-  private processMessages(time: number, headId: string, messages: any[]) {
+  public process(time: number, headId: string, messages: any[]) {
     let tracks: Track[] = this.heads.get(headId);
 
     if (tracks == null) {
@@ -51,6 +33,18 @@ export class MidiPlayer extends BasePlayer {
         track.velocityChange(v);
       }
     });
+  }
+
+  public ended(): void {
+    this.output.allSoundOff();
+  }
+
+  headEnded(headId: string): void {
+    const tracks: Track[] = this.heads.get(headId);
+    if (tracks) {
+      tracks.forEach(track => track.silence());
+      this.heads.set(headId, null);
+    }
   }
 }
 
