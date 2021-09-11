@@ -4,6 +4,7 @@ import {
   Assign,
   AstNodeKind,
   Binary,
+  Control,
   Expr,
   Jump,
   Logical,
@@ -50,7 +51,7 @@ export class Head {
   }
 
   private wait(): void {
-    this._nextTime += this._stepLength;
+    this._nextTime += this._stepLength / this.player.speed;
 
     this.player.schedule(this._nextTime, () => this.readNextStep());
   }
@@ -84,6 +85,9 @@ export class Head {
         break;
       case AstNodeKind.INNER_SEQUENCE:
         this.innerSequence(step.maybeSequence);
+        break;
+      case AstNodeKind.CONTROL_MESSAGE:
+        this.controlMessage(step);
         break;
       default:
         this.readNextStep();
@@ -138,6 +142,9 @@ export class Head {
         this._currentSequence = expr;
         this._currentStepIndex = -1;
         this.readNextStep();
+        break;
+      case AstNodeKind.TERNARY_COND:
+        this.readTernary(expr);
         break;
       case AstNodeKind.BINARY:
       case AstNodeKind.LOGICAL:
@@ -222,6 +229,39 @@ export class Head {
       .forEach(processor => processor.headEnded(this.id));
     this._ended();
   }
+
+  private controlMessage(message: Control): void {
+    if (message.target.lexeme === 'player') {
+      message.params.forEach(param => {
+        if (param.kind === AstNodeKind.PARAM) {
+          if (param.assignee.lexeme === 'speed') {
+            this.player.speed = evaluateAsPrimitive(param.value, {});
+          }
+        }
+      });
+    } else if (message.target.lexeme === 'head') {
+      message.params.forEach(param => {
+        if (param.kind === AstNodeKind.PARAM) {
+          if (param.assignee.lexeme === 'stepDuration') {
+            this._stepLength = evaluateAsPrimitive(param.value, {});
+            console.log(this._stepLength);
+          }
+        }
+      });
+    }
+
+    this.readNextStep();
+  }
+
+  private readTernary(expr: TernaryCondition): void {
+    const env = {};
+
+    if (evaluateAsPrimitive(expr.condition, env)) {
+      this.readSequence(expr.ifBranch);
+    } else {
+      this.readSequence(expr.elseBranch);
+    }
+  }
 }
 
 export interface MessageProcessor {
@@ -239,6 +279,17 @@ export class BasePlayer {
   private _hasReachedEnd: boolean;
   private readonly _eventQueue = new EventQueue<Function>();
   private _messageProcessors: MessageProcessor[] = [];
+  private _speed: number = 1;
+
+  public set speed(speed: number) {
+    if (speed > 0) {
+      this._speed = speed;
+    }
+  }
+
+  public get speed(): number {
+    return this._speed;
+  }
 
   public get processors(): MessageProcessor[] {
     return this._messageProcessors;
@@ -309,27 +360,6 @@ export class BasePlayer {
   }
 }
 
-export class PrintProcessor implements MessageProcessor {
-  ended(): void {
-    console.log('Ended');
-  }
-
-  process(time: number, headId: string, messages: any[]): void {
-    console.log(time, headId, messages);
-  }
-}
-
-function evaluateLogical(expr: Logical, env: any): null | any {
-  const left = evaluateAsPrimitive(expr.left, env);
-  const right = evaluateAsPrimitive(expr.right, env);
-
-  if (expr.operator.type === TokenType.AMPERSAND) {
-    return left && right;
-  } else {
-    return left || right;
-  }
-}
-
 function evaluateAsPrimitive(expr: Expr, env: any): any {
   if (expr == null) {
     return null;
@@ -397,6 +427,17 @@ function evaluateTernaryCondition(expr: TernaryCondition, env: any): null | any 
     return evaluateAsPrimitive(expr.ifBranch, env);
   } else {
     return evaluateAsPrimitive(expr.elseBranch, env)
+  }
+}
+
+function evaluateLogical(expr: Logical, env: any): null | any {
+  const left = evaluateAsPrimitive(expr.left, env);
+  const right = evaluateAsPrimitive(expr.right, env);
+
+  if (expr.operator.type === TokenType.AMPERSAND) {
+    return left && right;
+  } else {
+    return left || right;
   }
 }
 

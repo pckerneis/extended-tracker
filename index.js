@@ -1,4 +1,3 @@
-
 const chalk = require('chalk');
 const pjson = require('./package.json');
 const commander = require('commander');
@@ -6,11 +5,7 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const midi = require('midi');
 const chokidar = require('chokidar');
-const MidiOutput = require('./dist/midi/MidiOutput').MidiOutput;
-const MidiProcessor = require('./dist/player/MidiProcessor').MidiProcessor;
-const PrintProcessor = require('./dist/player/Player').PrintProcessor;
-const Player = require('./dist/player/Player').BasePlayer;
-const {formatTime} = require('./dist/utils/time');
+const runProgram = require('./dist/runner').runProgram;
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
 
@@ -22,43 +17,10 @@ if (!output.getPortCount()) {
   return 0;
 }
 
-let wroteOnce = false;
-
-function onStepPlayed(stepInfo) {
-  const pathMaxLength = 24;
-  const path = stepInfo.sequenceStack.join('/');
-  const truncated = path.length > pathMaxLength ? path.slice(path.length - pathMaxLength) : path;
-  const fixedSize = truncated.padEnd(pathMaxLength, ' ');
-  const stepNumber = stepInfo.stepNumber;
-  const messageBar = new Array(stepInfo.noteOnCount).fill('#').join('');
-  const t = stepInfo.timeStep + 1;
-  const time = formatTime(stepInfo.timePosition);
-  const context = `${time} [${t}] ${fixedSize} [${stepNumber}]`;
-  const string = `${context} ${messageBar} `.padEnd(80);
-
-  if (! wroteOnce) {
-    wroteOnce = true;
-  } else {
-    process.stdout.clearLine(0);
-  }
-
-  process.stdout.cursorTo(0);
-  process.stdout.write(string);
-}
-
-const errorReporter = {
-  reportError: (...args) => {
-    if (args.length > 0) {
-      console.log('');
-      console.error(...args);
-    }
-  }
-}
-
 let foundFile;
 let foundOutput;
 let foundEntry;
-const codeSource = {};
+const codeProvider = {};
 main();
 
 async function main() {
@@ -110,22 +72,14 @@ async function main() {
       chokidar
         .watch(foundFile)
         .on('change', () => {
-          codeSource.code = fs.readFileSync(foundFile, 'utf8');
+          codeProvider.code = fs.readFileSync(foundFile, 'utf8');
         });
 
-      runProgram();
+      codeProvider.code = fs.readFileSync(foundFile, 'utf8');
+      runProgram(codeProvider, foundEntry, output, onProgramEnded);
     });
 
   commander.parse(process.argv);
-}
-
-function runProgram() {
-  codeSource.code = fs.readFileSync(foundFile, 'utf8');
-  Player.read(codeSource, foundEntry, [
-    new MidiProcessor(new MidiOutput(output)),
-    new PrintProcessor(),
-    { ended: () => onProgramEnded(), process: () => {} }
-  ]);
 }
 
 function printAvailableMidiOutputDevices() {
