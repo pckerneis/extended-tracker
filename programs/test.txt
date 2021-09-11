@@ -7,8 +7,8 @@ p: 64, v: 20
 seqC = [p: 75 + 5, v: 20 | p: 72 - 15, v: 40]
 
 seqA = [
-{seqC}
 {seqB}
+{seqC}
 ]
 
 

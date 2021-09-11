@@ -182,7 +182,7 @@ export class Parser {
         continue;
       }
 
-      const parsed = this.param();
+      const parsed = this.param(closingTokens);
       if (parsed != null) {
         expressions.push(parsed);
       }
@@ -191,7 +191,7 @@ export class Parser {
     return expressions;
   }
 
-  private param(): Expr {
+  private param(closingTokens: TokenType[]): Expr {
     const expr = this.primary();
 
     if (expr.kind === 'VARIABLE') {
@@ -207,7 +207,7 @@ export class Parser {
           colon,
           value,
         };
-      } else if ([this.paramSeparator, this.trackSeparator, ...this.stepSeparators].includes(this.peek().type)) {
+      } else if ([this.paramSeparator, this.trackSeparator, ...this.stepSeparators, ...closingTokens].includes(this.peek().type)) {
         return {
           kind: AstNodeKind.PARAM,
           assignee: name,
