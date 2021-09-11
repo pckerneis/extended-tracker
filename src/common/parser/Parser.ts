@@ -1,4 +1,4 @@
-import {Token, TokenType} from '../scanner/tokens';
+import {Token, TokenType} from '../scanner/Tokens';
 import {AstNodeKind, Control, Expr, Flag, Jump, SequenceFlagRef} from './Ast';
 
 export class Parser {

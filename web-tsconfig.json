@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
       "target": "es2015",
-      "module": "commonjs",
+      "module": "es6",
       "lib": ["es2017", "es7", "es6", "dom"],
       "moduleResolution": "node",
       "sourceMap": false,
@@ -14,8 +14,8 @@
       "declaration": true,
       "types": [ "node", "@types/jest" ],
       "typeRoots": [ "../node_modules/@types" ],
-      "outDir": "dist/node/"
+      "outDir": "dist/web/"
     },
-    "include": [ "src/common/**/*", "src/node/**/*" ],
+    "include": [ "src/**/*" ],
     "exclude": [ "node_modules" ]
 }

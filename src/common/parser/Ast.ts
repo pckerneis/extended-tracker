@@ -1,4 +1,4 @@
-import {Token} from '../scanner/tokens';
+import {Token} from '../scanner/Tokens';
 
 export enum AstNodeKind {
   SEQUENCE = 'SEQUENCE',

@@ -5,7 +5,7 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const midi = require('midi');
 const chokidar = require('chokidar');
-const runProgram = require('./dist/runner').runProgram;
+const runProgram = require('./dist/node/node/runner').runProgram;
 
 console.log(chalk.green.bold(`Starting ${pjson.name}-${pjson.version}`));
 

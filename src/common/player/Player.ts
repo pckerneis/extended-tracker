@@ -15,6 +15,13 @@ export interface MessageProcessor {
   ended?: () => void;
 }
 
+export interface PlayerOptions {
+  codeProvider: CodeProvider,
+  entryPoint: string,
+  processors: MessageProcessor[];
+  clockFn: () => number;
+}
+
 export class Player {
   protected _lookAhead: number = 0.1;
 
@@ -53,12 +60,10 @@ export class Player {
                         private readonly clock: () => number) {
   }
 
-  static read(codeProvider: CodeProvider,
-              entryPoint: string,
-              processors: MessageProcessor[]) {
-    const player = new Player(codeProvider, defaultClock);
-    player._messageProcessors = processors;
-    player.start(entryPoint);
+  static read(options: PlayerOptions) {
+    const player = new Player(options.codeProvider, options.clockFn);
+    player._messageProcessors = options.processors;
+    player.start(options.entryPoint);
   }
 
   public findDeclaration(name: string): Assign {
@@ -146,10 +151,4 @@ export class Player {
       return acc;
     }, builtins);
   }
-}
-
-const {performance} = require('perf_hooks');
-
-export function defaultClock(): number {
-  return performance.now() / 1000;
 }

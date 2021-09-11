@@ -8,9 +8,9 @@ import {
   InnerSequence,
   Variable,
   Binary, Call
-} from '../../src/parser/Ast';
-import {Parser} from '../../src/parser/Parser';
-import {Scanner} from '../../src/scanner/Scanner';
+} from '../../src/common/parser/Ast';
+import {Parser} from '../../src/common/parser/Parser';
+import {Scanner} from '../../src/common/scanner/Scanner';
 import {AstNodeKind, TernaryCondition, TrackList} from "../../dist/parser/Ast";
 
 test('should parse whitespace', () => {

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Demo</title>
+</head>
+<body>
+<div>
+    <label>Midi output
+        <select id="midiOutput"></select>
+    </label>
+    <button id="testMidiButton">Test</button>
+</div>
+<textarea id="editor" spellcheck="false">
+Root = [
+    p: 69, v: 100
+    p: 69, v: 100
+    p: 69, v: 100
+    -
+    p: 69, v: 100
+    p: 69, v: 100
+    p: 69, v: 100
+    -
+]
+</textarea>
+<div>
+    <button id="startButton">Start</button>
+</div>
+</body>
+<script src="../dist/web/bundle.js"></script>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        background: #00000012;
+        font-family: "Roboto Light", Calibri, serif;
+    }
+    #editor {
+        flex-grow: 1;
+        margin: 10px 0;
+        width: 100%;
+        resize: none;
+    }
+</style>
+</html>
