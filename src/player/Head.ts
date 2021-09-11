@@ -3,17 +3,22 @@ import {Token, TokenType} from '../scanner/Tokens';
 import {Player} from './Player';
 import {Interpreter} from './Interpreter';
 
+let LATEST_ID = 0;
+
 export class Head {
+  public readonly id: string;
+
   private _currentSequence: Sequence;
   private _currentStepIndex: number;
   private _nextTime: number;
   private _stepLength: number;
   private _environments: any[] = [];
 
-  private constructor(public readonly id: string,
+  private constructor(id: string,
                       public readonly player: Player,
                       private readonly _parentHead: Head,
                       private _ended: Function) {
+    this.id = id + (LATEST_ID++);
     this._nextTime = _parentHead?._nextTime ?? 0;
     this._stepLength = _parentHead?._stepLength ?? 1;
   }
