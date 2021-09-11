@@ -25,7 +25,7 @@ export class MidiProcessor implements MessageProcessor {
         tracks[trackIndex] = track;
       }
 
-      if (message.silent) {
+      if (message.hasOwnProperty('-')) {
         track.silence();
       } else if (!isNaN(p) && p >= 0 && p < 128) {
         track.noteOn(p, v, c);

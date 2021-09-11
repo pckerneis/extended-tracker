@@ -1,24 +1,26 @@
-import {Player, CodeProvider} from '../common/player/Player';
+import {CodeProvider, Player} from '../common/player/Player';
 import {MidiProcessor} from '../common/player/MidiProcessor';
 import {PrintProcessor} from '../common/player/PrintProcessor';
 import {NodeMidiOutput} from '../common/midi/NodeMidiOutput';
-const {performance} = require('perf_hooks');
+import {performance} from 'perf_hooks';
 
 export function defaultClock(): number {
   return performance.now() / 1000;
 }
 
 export function runProgram(codeProvider: CodeProvider,
-                    entryPoint: string,
-                    output: any,
-                    onProgramEnded: Function) {
+                           entryPoint: string,
+                           output: never,
+                           onProgramEnded: () => void): void {
   Player.read({
     codeProvider,
     entryPoint,
     processors: [
       new MidiProcessor(new NodeMidiOutput(output)),
       new PrintProcessor(),
-      { ended: () => onProgramEnded(), process: () => {} }
+      {
+        ended: () => onProgramEnded(), process: () => {}
+      }
     ],
     clockFn: defaultClock,
   });
