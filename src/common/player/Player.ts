@@ -52,7 +52,11 @@ export class Player {
   public get expressions(): Expr[] {
     if (this.codeProvider.code !== this._latestEvaluatedCode) {
       this._latestEvaluatedCode = this.codeProvider.code;
-      this._exprs = Parser.parse(Scanner.scan(this.codeProvider.code));
+      try {
+        this._exprs = Parser.parse(Scanner.scan(this.codeProvider.code));
+      } catch(e) {
+        console.error(e);
+      }
     }
 
     return this._exprs;

@@ -9,6 +9,7 @@ export class Head {
   public readonly id: string;
 
   private _currentSequence: Sequence;
+  private _currentRootDeclarationName: string;
   private _currentStepIndex: number;
   private _nextTime: number;
   private _stepLength: number;
@@ -97,20 +98,44 @@ export class Head {
   private jump(jump: Jump): void {
     // TODO Outer jump (what is the flag scope ? what if more than 1 ? what if in inner ?)
     // TODO "recursive search" ?
-    const flag = this._currentSequence.expressions.find(step => step.kind === AstNodeKind.FLAG
-      && step.name.lexeme === jump.flag.lexeme);
+    const targetFlagName = jump.flag.lexeme;
+    const freshlyParsedRootSequence = this.player.findDeclaration(this._currentRootDeclarationName);
 
-    if (flag != null) {
-      this._currentStepIndex = this._currentSequence.expressions.indexOf(flag);
+    if (freshlyParsedRootSequence) {
+      this.findFlagAndJump(freshlyParsedRootSequence.value, targetFlagName);
+    } else {
+      const flag = this._currentSequence.expressions.find(step => step.kind === AstNodeKind.FLAG
+        && step.name.lexeme === jump.flag.lexeme);
+
+      if (flag != null) {
+        this._currentStepIndex = this._currentSequence.expressions.indexOf(flag);
+      }
     }
 
     this.readNextStep();
+  }
+
+  private findFlagAndJump(expr: Expr, targetFlagName: string): boolean {
+    switch (expr.kind) {
+      case AstNodeKind.SEQUENCE:
+        for (const stepExpr of expr.expressions) {
+          if (stepExpr.kind === AstNodeKind.FLAG && stepExpr.name.lexeme === targetFlagName) {
+            this._currentSequence = expr;
+            this._currentStepIndex = this._currentSequence.expressions.indexOf(stepExpr);
+            return true;
+          }
+        }
+        break;
+    }
+
+    return false;
   }
 
   private readRootSequence(name: string): void {
     const match = this.player.findDeclaration(name);
 
     if (match) {
+      this._currentRootDeclarationName = name;
       this.readSequence(match.value);
     }
   }
