@@ -145,7 +145,7 @@ export class Player {
 
     return this.expressions.reduce((acc, curr) => {
       if (curr.kind === AstNodeKind.ASSIGN) {
-        acc[curr.assignee.lexeme] = Interpreter.evaluateAsPrimitive(curr.value, {});
+        acc[curr.assignee.lexeme] = Interpreter.evaluateAsPrimitive(curr.value, builtins);
       }
       return acc;
     }, builtins);
