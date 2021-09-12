@@ -12,7 +12,7 @@ export function runProgram(codeProvider: CodeProvider,
                            entryPoint: string,
                            output: never,
                            onProgramEnded: () => void): void {
-  Player.read({
+  const player = Player.create({
     codeProvider,
     entryPoint,
     processors: [
@@ -24,4 +24,6 @@ export function runProgram(codeProvider: CodeProvider,
     ],
     clockFn: defaultClock,
   });
+
+  player.start(entryPoint);
 }

@@ -13,6 +13,7 @@ export interface MessageProcessor {
   process?: (time: number, headId: string, messages: any[]) => void;
   headEnded?: (headId: string) => void;
   ended?: () => void;
+  stopped?: () => void;
 }
 
 export interface PlayerOptions {
@@ -30,8 +31,9 @@ export class Player {
   private _startTime: number;
   private _hasReachedEnd: boolean;
   private readonly _eventQueue = new EventQueue<Function>();
-  private _messageProcessors: MessageProcessor[] = [];
   private _speed: number = 1;
+  private _stopped: boolean = true;
+  private _intervalMs: number = 10;
 
   public set speed(speed: number) {
     if (speed > 0) {
@@ -57,13 +59,12 @@ export class Player {
   }
 
   protected constructor(private readonly codeProvider: CodeProvider,
-                        private readonly clock: () => number) {
+                        private readonly clock: () => number,
+                        private readonly _messageProcessors: MessageProcessor[]) {
   }
 
-  static read(options: PlayerOptions) {
-    const player = new Player(options.codeProvider, options.clockFn);
-    player._messageProcessors = options.processors;
-    player.start(options.entryPoint);
+  public static create(options: PlayerOptions): Player {
+    return new Player(options.codeProvider, options.clockFn, options.processors);
   }
 
   public findDeclaration(name: string): Assign {
@@ -71,7 +72,7 @@ export class Player {
       .find(expr => expr.kind === AstNodeKind.ASSIGN && expr.assignee.lexeme === name) as Assign;
   }
 
-  public checkRootSequenceType(name: string): Assign {
+  private checkRootSequenceType(name: string): Assign {
     const decl = this.findDeclaration(name);
 
     if (decl === null) {
@@ -94,7 +95,11 @@ export class Player {
     throw new Error('Entry point should evaluate to a sequence.')
   }
 
-  protected start(entryPoint: string): void {
+  public start(entryPoint: string): void {
+    if (! this._stopped) {
+      this.stop();
+    }
+
     this.checkRootSequenceType(entryPoint);
 
     Head.start(this,
@@ -109,23 +114,17 @@ export class Player {
       });
 
     this._startTime = this.clock();
+    this._hasReachedEnd = false;
+    this._stopped = false;
     this.next();
   }
-
-  private next(): void {
-    const now = this.clock() - this._startTime;
-    let next: Function;
-
-    do {
-      next = this._eventQueue.next(now + this._lookAhead)?.event;
-
-      if (next) {
-        next();
-      }
-    } while (next);
-
-    if (!this._hasReachedEnd) {
-      setTimeout(() => this.next(), 10);
+  
+  public stop(): void {
+    if (! this._stopped) {
+      this._stopped = true;
+      this._messageProcessors
+        .filter(processor => typeof processor.stopped === 'function')
+        .forEach(processor => processor.stopped());
     }
   }
 
@@ -139,7 +138,7 @@ export class Player {
       .forEach(processor => processor.process(time, headId, messages));
   }
 
-  rootEnv(): any {
+  public rootEnv(): any {
     const builtins = {
       randf: () => Math.random(),
     };
@@ -150,5 +149,26 @@ export class Player {
       }
       return acc;
     }, builtins);
+  }
+
+  private next(): void {
+    if (this._stopped) {
+      return;
+    }
+
+    const now = this.clock() - this._startTime;
+    let next: Function;
+
+    do {
+      next = this._eventQueue.next(now + this._lookAhead)?.event;
+
+      if (next) {
+        next();
+      }
+    } while (next);
+
+    if (!this._hasReachedEnd) {
+      setTimeout(() => this.next(), this._intervalMs);
+    }
   }
 }

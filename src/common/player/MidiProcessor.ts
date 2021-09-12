@@ -2,7 +2,7 @@ import {MidiOutput} from '../midi/MidiOutput';
 import {MessageProcessor} from './Player';
 
 export class MidiProcessor implements MessageProcessor {
-  private heads = new Map<string, Track[]>();
+  private readonly heads = new Map<string, Track[]>();
 
   constructor(public readonly output: MidiOutput) {}
 
@@ -36,7 +36,11 @@ export class MidiProcessor implements MessageProcessor {
   }
 
   public ended(): void {
-    this.output.allSoundOff();
+    this.silenceAndReset();
+  }
+
+  public stopped(): void {
+    this.silenceAndReset();
   }
 
   headEnded(headId: string): void {
@@ -45,6 +49,12 @@ export class MidiProcessor implements MessageProcessor {
       tracks.forEach(track => track.silence());
       this.heads.set(headId, null);
     }
+  }
+
+  private silenceAndReset(): void {
+    this.heads.forEach((tracks) => tracks?.forEach(track => track.silence()));
+    this.output.allSoundOff();
+    this.heads.clear();
   }
 }
 

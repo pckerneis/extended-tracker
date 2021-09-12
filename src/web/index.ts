@@ -43,13 +43,25 @@ let midiOutput: any = null;
     console.debug(midiOutput);
   };
 
-  document.getElementById('startButton').onclick = () => {
-    Player.read({
-      codeProvider: {code: textArea['value']},
-      clockFn: () => performance.now() / 1000,
-      processors: [new MidiProcessor(midiOutput)],
-      entryPoint: 'Root'
-    });
+  const startButton = document.getElementById('startButton');
+  let player: Player;
+
+  startButton.onclick = () => {
+    if (player != null) {
+      startButton.innerText = 'Start';
+      player.stop();
+      player = null;
+    } else {
+      startButton.innerText = 'Stop';
+      player = Player.create({
+        codeProvider: {code: textArea['value']},
+        clockFn: () => performance.now() / 1000,
+        processors: [new MidiProcessor(midiOutput)],
+        entryPoint: 'Root'
+      });
+
+      player.start('Root');
+    }
   };
 
   textArea.oninput = debounce(() => {
