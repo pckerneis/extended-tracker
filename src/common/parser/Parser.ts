@@ -22,6 +22,9 @@ export class Parser {
 
   private readonly controlMessageToken = TokenType.DOLLAR;
 
+  private currentDeclarationName: string;
+  private readonly registeredFlags = new Map<string, string[]>();
+
   private constructor(public readonly tokens: Token[]) {
   }
 
@@ -54,6 +57,8 @@ export class Parser {
     this.consumeNewLines();
 
     const identifier = this.consume([TokenType.IDENTIFIER], 'Expect identifier');
+    this.currentDeclarationName = identifier.lexeme;
+
     const params: Token[] = [];
 
     if (this.match(TokenType.LEFT_PAREN)) {
@@ -69,7 +74,9 @@ export class Parser {
     this.consumeNewLines();
     const equals = this.consume([TokenType.EQUAL], `Expect "${TokenType.EQUAL}" after identifier`);
     this.consumeNewLines();
+
     const value = this.expression();
+
 
     return {
       kind: AstNodeKind.ASSIGN,
@@ -294,7 +301,10 @@ export class Parser {
   private comparison(): Expr {
     let expr: Expr = this.addition();
 
-    while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL, TokenType.LEFT_LEFT, TokenType.RIGHT_RIGHT)) {
+    while (this.match(
+        TokenType.GREATER, TokenType.GREATER_EQUAL,
+        TokenType.LESS, TokenType.LESS_EQUAL,
+        TokenType.LEFT_LEFT, TokenType.RIGHT_RIGHT)) {
       const operator: Token = this.previous();
       const right: Expr = this.addition();
       expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};
@@ -504,10 +514,13 @@ export class Parser {
     const flagToken = this.previous();
 
     if (this.match(TokenType.IDENTIFIER)) {
+      const name = this.previous();
+      this.registerFlagForCurrentSequence(name);
+
       return {
         kind: AstNodeKind.FLAG,
         flagToken,
-        name: this.previous(),
+        name,
       };
     } else {
       throw new Error('Expected flag name after ' + this.flagToken);
@@ -530,6 +543,20 @@ export class Parser {
       flagName,
       flagToken,
     };
+  }
+
+  private registerFlagForCurrentSequence(flagToken: Token): void {
+    const flagName = flagToken.lexeme;
+    const currentFlags = this.registeredFlags.get(this.currentDeclarationName) ?? [];
+
+    if (currentFlags.includes(flagName)) {
+      throw new ParseError(
+        flagToken,
+        `A flag named "${flagName}" was already registered with within declaration "${this.currentDeclarationName}"`);
+    }
+
+    const flags = [...currentFlags, flagName];
+    this.registeredFlags.set(this.currentDeclarationName, flags);
   }
 }
 
