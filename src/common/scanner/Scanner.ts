@@ -52,6 +52,15 @@ export class Scanner {
 
     if (c != null && c != '') {
       switch (c) {
+        case '/':
+          if (this.match(TokenType.SLASH)) {
+            while (this.peek() !== '\n') {
+              this.advance();
+            }
+          } else {
+            this.addToken(TokenType.SLASH);
+          }
+          break;
         case '"':
           this.string();
           break;
@@ -100,9 +109,6 @@ export class Scanner {
         case '@':
           this.addToken(TokenType.AT);
           break;
-        case '&':
-          this.addToken(TokenType.AMPERSAND);
-          break;
         case ';':
           this.addToken(TokenType.SEMICOLON);
           break;
@@ -112,14 +118,8 @@ export class Scanner {
         case '#':
           this.addToken(TokenType.DASH);
           break;
-        case '/':
-          if (this.match(TokenType.SLASH)) {
-            while (this.peek() !== '\n') {
-              this.advance();
-            }
-          } else {
-            this.addToken(TokenType.SLASH);
-          }
+        case '&':
+          this.addToken(this.match('&') ? TokenType.DOUBLE_AMPERSAND : TokenType.AMPERSAND);
           break;
         case '|':
           this.addToken(this.match('|') ? TokenType.DOUBLE_PIPE : TokenType.PIPE);

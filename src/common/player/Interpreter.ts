@@ -78,7 +78,7 @@ export class Interpreter {
     const left = this.evaluateAsPrimitive(expr.left, env);
     const right = this.evaluateAsPrimitive(expr.right, env);
 
-    if (expr.operator.type === TokenType.AMPERSAND) {
+    if (expr.operator.type === TokenType.DOUBLE_AMPERSAND) {
       return left && right;
     } else {
       return left || right;

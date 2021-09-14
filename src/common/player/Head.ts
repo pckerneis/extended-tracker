@@ -165,7 +165,7 @@ export class Head {
 
   private readSequenceOperation(left: Expr, right: Expr, operator: Token): void {
     switch (operator.type) {
-      case TokenType.AMPERSAND:
+      case TokenType.DOUBLE_AMPERSAND:
         return this.readAll(left, right);
       case TokenType.DOUBLE_PIPE:
         return this.readAny(left, right);

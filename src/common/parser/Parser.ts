@@ -270,7 +270,7 @@ export class Parser {
   private and(): Expr {
     let expr = this.equality();
 
-    while (this.match(TokenType.AMPERSAND)) {
+    while (this.match(TokenType.DOUBLE_AMPERSAND)) {
       const operator: Token = this.previous();
       const right: Expr = this.equality();
       expr = {kind: AstNodeKind.LOGICAL, left: expr, operator, right};

@@ -4,7 +4,7 @@ import {PrintProcessor} from '../common/player/PrintProcessor';
 import {NodeMidiOutput} from '../common/midi/NodeMidiOutput';
 import {performance} from 'perf_hooks';
 
-export function defaultClock(): number {
+function clockFn(): number {
   return performance.now() / 1000;
 }
 
@@ -16,13 +16,13 @@ export function runProgram(codeProvider: CodeProvider,
     codeProvider,
     entryPoint,
     processors: [
-      new MidiProcessor(new NodeMidiOutput(output), defaultClock),
+      new MidiProcessor(new NodeMidiOutput(output), clockFn),
       new PrintProcessor(),
       {
         ended: () => onProgramEnded(), process: () => {}
       }
     ],
-    clockFn: defaultClock,
+    clockFn,
   });
 
   player.start(entryPoint);
