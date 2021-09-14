@@ -1,5 +1,25 @@
 import {Token, TokenType} from '../scanner/Tokens';
 import {AstNodeKind, Control, Expr, Flag, Jump, SequenceFlagRef} from './Ast';
+import {ErrorReporter} from '../error/ErrorReporter';
+
+export class ParseResult {
+
+  private constructor(
+    readonly expressions: Expr[],
+    readonly hasError: boolean,
+    readonly error?: any) {
+  }
+
+  public static OK(expressions: Expr[]): ParseResult {
+    return new ParseResult(expressions, false);
+  }
+
+  public static fromError(error: any): ParseResult {
+    return new ParseResult([], true, error);
+  }
+
+
+}
 
 export class Parser {
   private current: number = 0;
@@ -28,9 +48,19 @@ export class Parser {
   private constructor(public readonly tokens: Token[]) {
   }
 
-  public static parse(tokens: Token[]): Expr[] {
-    const scanner = new Parser(tokens);
-    return scanner.doParse();
+  public static parse(tokens: Token[], code: string, errorReporter: ErrorReporter): ParseResult {
+    const parser = new Parser(tokens);
+    try {
+      return ParseResult.OK(parser.doParse());
+    } catch (e) {
+      if (e instanceof ParseError) {
+        errorReporter.reportError(prettyPrintParseError(e, code));
+      } else {
+        errorReporter.reportError(e);
+      }
+
+      return ParseResult.fromError(e);
+    }
   }
 
   private doParse(): Expr[] {
@@ -62,7 +92,7 @@ export class Parser {
     const params: Token[] = [];
 
     if (this.match(TokenType.LEFT_PAREN)) {
-      if (! this.match(TokenType.RIGHT_PAREN)) {
+      if (!this.match(TokenType.RIGHT_PAREN)) {
         do {
           params.push(this.consume([TokenType.IDENTIFIER], 'Expect parameter name'));
         } while (this.match(TokenType.COMMA));
@@ -152,7 +182,7 @@ export class Parser {
       if (this.check(this.trackSeparator)) {
         tracks.push({
           kind: AstNodeKind.PARAMS,
-          params : [],
+          params: [],
         });
 
         continue;
@@ -180,7 +210,7 @@ export class Parser {
       }
 
       if (this.match(this.paramSeparator)) {
-        expressions.push({ kind: AstNodeKind.EMPTY_PARAM });
+        expressions.push({kind: AstNodeKind.EMPTY_PARAM});
 
         while (this.check(this.paramSeparator)) {
           this.advance();
@@ -302,9 +332,9 @@ export class Parser {
     let expr: Expr = this.addition();
 
     while (this.match(
-        TokenType.GREATER, TokenType.GREATER_EQUAL,
-        TokenType.LESS, TokenType.LESS_EQUAL,
-        TokenType.LEFT_LEFT, TokenType.RIGHT_RIGHT)) {
+      TokenType.GREATER, TokenType.GREATER_EQUAL,
+      TokenType.LESS, TokenType.LESS_EQUAL,
+      TokenType.LEFT_LEFT, TokenType.RIGHT_RIGHT)) {
       const operator: Token = this.previous();
       const right: Expr = this.addition();
       expr = {kind: AstNodeKind.BINARY, left: expr, operator, right};
@@ -545,13 +575,13 @@ export class Parser {
     };
   }
 
-  private registerFlagForCurrentSequence(flagToken: Token): void {
-    const flagName = flagToken.lexeme;
+  private registerFlagForCurrentSequence(flagNameToken: Token): void {
+    const flagName = flagNameToken.lexeme;
     const currentFlags = this.registeredFlags.get(this.currentDeclarationName) ?? [];
 
     if (currentFlags.includes(flagName)) {
       throw new ParseError(
-        flagToken,
+        flagNameToken,
         `A flag named "${flagName}" was already registered with within declaration "${this.currentDeclarationName}"`);
     }
 
@@ -563,6 +593,30 @@ export class Parser {
 class ParseError extends Error {
   constructor(public readonly token: Token,
               message: string) {
-    super(`${message} at [${token.position.line + 1}:${token.position.column}]`);
+    super(message);
   }
 }
+
+function prettyPrintParseError(error: ParseError, code: string): string {
+  const {message, token} = error;
+  const maxContextLength = 30;
+  const tokenStart = token.position.column;
+
+  let context = code.split('\n')[token.position.line];
+  let startOffset = 0;
+
+  if (context.length > maxContextLength) {
+    const start = Math.max(0, tokenStart - maxContextLength / 2);
+    const end = Math.min(tokenStart + (maxContextLength / 2), context.length);
+    startOffset = Math.ceil(Math.min(start, end - maxContextLength));
+    context = context.slice(startOffset, Math.ceil(Math.max(end, start + maxContextLength)));
+  }
+
+  const pointer = new Array(tokenStart - startOffset).fill(' ').join('') + '^';
+
+  return `ParseError: ${message}
+       at line ${token.position.line + 1}, column ${tokenStart}:
+       ${context}
+       ${pointer}`;
+}
+

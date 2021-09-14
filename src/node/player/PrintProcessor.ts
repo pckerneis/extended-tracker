@@ -1,5 +1,5 @@
-import {MessageProcessor} from './Player';
-import {formatTime} from '../utils/time';
+import {MessageProcessor} from '../../common/player/Player';
+import {formatTime} from '../../common/utils/time';
 
 export class PrintProcessor implements MessageProcessor {
   ended(): void {

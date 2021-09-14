@@ -4,6 +4,7 @@ import {Assign, AstNodeKind, Expr} from '../parser/Ast';
 import {EventQueue} from '../scheduler/EventQueue';
 import {Head} from './Head';
 import {Interpreter} from './Interpreter';
+import {ErrorReporter} from '../error/ErrorReporter';
 
 export interface CodeProvider {
   code: string;
@@ -23,6 +24,7 @@ export interface PlayerOptions {
   entryPoint: string,
   processors: MessageProcessor[];
   clockFn: () => number;
+  errorReporter: ErrorReporter;
 }
 
 export type ClockFunction = () => number;
@@ -61,13 +63,15 @@ export class Player {
     return this._messageProcessors;
   }
 
-  public get expressions(): ReadonlyArray<Expr> {
+  public get expressions(): ReadonlyArray<Expr> | undefined {
     if (this.codeProvider.code !== this._latestEvaluatedCode) {
       this._latestEvaluatedCode = this.codeProvider.code;
-      try {
-        this._exprs = Parser.parse(Scanner.scan(this.codeProvider.code));
-      } catch (e) {
-        console.error(e);
+
+      const tokens = Scanner.scan(this.codeProvider.code);
+      const parseResult = Parser.parse(tokens, this.codeProvider.code, this.errorReporter);
+
+      if (! parseResult.hasError) {
+        this._exprs = parseResult.expressions;
       }
     }
 
@@ -76,24 +80,25 @@ export class Player {
 
   protected constructor(private readonly codeProvider: CodeProvider,
                         private readonly clock: ClockFunction,
-                        private readonly _messageProcessors: MessageProcessor[]) {
+                        private readonly _messageProcessors: MessageProcessor[],
+                        private readonly errorReporter: ErrorReporter) {
     _messageProcessors.forEach(p => p.player = this);
   }
 
   public static create(options: PlayerOptions): Player {
-    return new Player(options.codeProvider, options.clockFn, options.processors);
+    return new Player(options.codeProvider, options.clockFn, options.processors, options.errorReporter);
   }
 
   public findDeclaration(name: string): Assign {
     return this.expressions
-      .find(expr => expr.kind === AstNodeKind.ASSIGN && expr.assignee.lexeme === name) as Assign;
+      ?.find(expr => expr.kind === AstNodeKind.ASSIGN && expr.assignee.lexeme === name) as Assign;
   }
 
   private checkRootSequenceType(name: string): Assign {
     const decl = this.findDeclaration(name);
 
-    if (decl === null) {
-      throw new Error('Cannot find entry point.');
+    if (decl == null) {
+      throw new RuntimeError('Cannot find entry point.');
     }
 
     const sequenceLikes = [
@@ -109,10 +114,19 @@ export class Player {
       return;
     }
 
-    throw new Error('Entry point should evaluate to a sequence.')
+    throw new RuntimeError('Entry point should evaluate to a sequence.')
   }
 
   public start(entryPoint: string): void {
+    try {
+      this.doStart(entryPoint);
+    } catch (e) {
+      this.errorReporter.reportError(e);
+      forEachCall(this._messageProcessors, 'stopped');
+    }
+  }
+
+  private doStart(entryPoint: string): void {
     if (!this._stopped) {
       this.stop();
     }
@@ -156,7 +170,7 @@ export class Player {
       randf: () => Math.random(),
     };
 
-    return this.expressions.reduce((acc, curr) => {
+    return this.expressions?.reduce((acc, curr) => {
       if (curr.kind === AstNodeKind.ASSIGN) {
         acc[curr.assignee.lexeme] = Interpreter.evaluateAsPrimitive(curr.value, builtins);
       }
@@ -192,4 +206,10 @@ function forEachCall<T>(items: T[], method: keyof T, ...args: any[]): void {
       (item[method] as any)(...args);
     }
   });
+}
+
+class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
 }

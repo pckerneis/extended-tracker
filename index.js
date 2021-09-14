@@ -76,7 +76,16 @@ async function main() {
         });
 
       codeProvider.code = fs.readFileSync(foundFile, 'utf8');
-      runProgram(codeProvider, foundEntry, output, onProgramEnded);
+
+      const runnerOptions = {
+        codeProvider,
+        entryPoint: foundEntry,
+        midiOutput: output,
+        onProgramEnded: () => onProgramEnded(runnerOptions),
+        reportError,
+      };
+
+      runProgram(runnerOptions);
     });
 
   commander.parse(process.argv);
@@ -89,15 +98,19 @@ function printAvailableMidiOutputDevices() {
   }
 }
 
-async function onProgramEnded() {
+async function onProgramEnded(runnerOptions) {
   console.log('');
 
   await inquirer.prompt([{type: 'confirm', name: 'confirm', message: 'Restart ?'}])
     .then(answers => {
       if (answers.confirm) {
-        runProgram();
+        runProgram(runnerOptions);
       } else {
         process.exit(0);
       }
     });
+}
+
+function reportError(...args) {
+  console.log(chalk.red(args));
 }

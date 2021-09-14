@@ -1,6 +1,7 @@
 import {WebMidiOutput} from '../common/midi/WebMidiOutput';
 import {Player} from '../common/player/Player';
 import {MidiProcessor} from '../common/player/MidiProcessor';
+import {defaultErrorReporter} from '../common/error/ErrorReporter';
 
 const PROGRAM_STORAGE_KEY = '_WEB_PLAYER_PROGRAM_987654321';
 const OUTPUT_STORAGE_KEY = '_WEB_PLAYER_MIDI_OUTPUT_987654321';
@@ -62,6 +63,11 @@ function updateCode(textArea: any, updateButton: any): void {
     midiOutput = new WebMidiOutput(midiAccess.outputs.get(midiOutputSelect.value));
   };
 
+  function stopped(): void {
+    startButton.innerText = 'Start';
+    player = null;
+  }
+
   function togglePlayState(): void {
     if (player != null) {
       startButton.innerText = 'Start';
@@ -73,8 +79,15 @@ function updateCode(textArea: any, updateButton: any): void {
       player = Player.create({
         codeProvider,
         clockFn,
-        processors: [new MidiProcessor(midiOutput, clockFn)],
-        entryPoint: 'Root'
+        processors: [
+          new MidiProcessor(midiOutput, clockFn),
+          {
+            stopped: () => stopped(),
+            ended: () => stopped(),
+          }
+        ],
+        entryPoint: 'Root',
+        errorReporter: defaultErrorReporter,
       });
 
       player.start('Root');
