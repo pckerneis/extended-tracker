@@ -23,6 +23,10 @@ export class EventQueue<EventType> {
         return this._events;
     }
 
+    public isEmpty(): boolean {
+        return  this.events.length === 0;
+    }
+
     public next(now: number): ScheduledEvent<EventType> | null {
         if (this._events.length === 0) {
             return null;
@@ -50,6 +54,10 @@ export class EventQueue<EventType> {
         this._events.splice(idx, 0, scheduledEvent);
 
         return scheduledEvent.ref;
+    }
+
+    public clear(): void {
+        this._events = [];
     }
 
     // Recursive divide and conquer to find insert index in already sorted array

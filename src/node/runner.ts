@@ -16,7 +16,7 @@ export function runProgram(codeProvider: CodeProvider,
     codeProvider,
     entryPoint,
     processors: [
-      new MidiProcessor(new NodeMidiOutput(output)),
+      new MidiProcessor(new NodeMidiOutput(output), defaultClock),
       new PrintProcessor(),
       {
         ended: () => onProgramEnded(), process: () => {}

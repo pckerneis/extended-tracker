@@ -1,10 +1,40 @@
 import {MidiOutput} from '../midi/MidiOutput';
-import {MessageProcessor} from './Player';
+import {ClockFunction, MessageProcessor, Player} from './Player';
+import {EventQueue} from '../scheduler/EventQueue';
 
 export class MidiProcessor implements MessageProcessor {
+  player?: Player;
+
   private readonly heads = new Map<string, Track[]>();
 
-  constructor(public readonly output: MidiOutput) {}
+  private readonly _eventQueue: EventQueue<Function> = new EventQueue<Function>();
+
+  constructor(public readonly output: MidiOutput, public readonly clock: ClockFunction) {
+  }
+
+  private run() {
+    if (this.player.stopped && this._eventQueue.isEmpty()) {
+      return;
+    }
+
+    const now = this.clock() - this.player.startTime;
+
+    let next: Function;
+
+    do {
+      next = this._eventQueue.next(now)?.event;
+
+      if (next) {
+        next();
+      }
+    } while (next);
+
+    setTimeout(() => this.run(), 0);
+  }
+
+  public started(): void {
+    this.run();
+  }
 
   public process(time: number, headId: string, messages: any[]) {
     let tracks: Track[] = this.heads.get(headId);
@@ -25,13 +55,15 @@ export class MidiProcessor implements MessageProcessor {
         tracks[trackIndex] = track;
       }
 
-      if (message.hasOwnProperty('-')) {
-        track.silence();
-      } else if (!isNaN(p) && p >= 0 && p < 128) {
-        track.noteOn(p, v, c);
-      } else if (v != null) {
-        track.velocityChange(v);
-      }
+      this._eventQueue.add(time, () => {
+        if (message.hasOwnProperty('-')) {
+          track.silence();
+        } else if (!isNaN(p) && p >= 0 && p < 128) {
+          track.noteOn(p, v, c);
+        } else if (v != null) {
+          track.velocityChange(v);
+        }
+      });
     });
   }
 
@@ -52,6 +84,7 @@ export class MidiProcessor implements MessageProcessor {
   }
 
   private silenceAndReset(): void {
+    this._eventQueue.clear();
     this.heads.forEach((tracks) => tracks?.forEach(track => track.silence()));
     this.output.allSoundOff();
     this.heads.clear();

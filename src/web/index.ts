@@ -2,10 +2,12 @@ import {WebMidiOutput} from '../common/midi/WebMidiOutput';
 import {Player} from '../common/player/Player';
 import {MidiProcessor} from '../common/player/MidiProcessor';
 
-const PROGRAM_STORAGE_KEY = '_WEB_PLAYER_PROGRAM_987654321'
-const OUTPUT_STORAGE_KEY = '_WEB_PLAYER_MIDI_OUTPUT_987654321'
+const PROGRAM_STORAGE_KEY = '_WEB_PLAYER_PROGRAM_987654321';
+const OUTPUT_STORAGE_KEY = '_WEB_PLAYER_MIDI_OUTPUT_987654321';
 
 let midiOutput: any = null;
+let player: Player;
+const codeProvider = {code: ''};
 
 function buildMidiOutputOptions(midiOutputSelect: any, midiAccess: any): void {
   const noneOption = midiOutputSelect.appendChild(document.createElement('option'));
@@ -23,6 +25,7 @@ function restoreFromLocaleStorage(textArea: any, midiOutputSelect: any, midiAcce
 
   if (storedProgram) {
     textArea.value = storedProgram;
+    codeProvider.code = textArea.value;
   }
 
   const storedOutput = localStorage.getItem(OUTPUT_STORAGE_KEY);
@@ -33,7 +36,7 @@ function restoreFromLocaleStorage(textArea: any, midiOutputSelect: any, midiAcce
   }
 }
 
-function updateCode(codeProvider: { code: any }, textArea: any, updateButton: any): void {
+function updateCode(textArea: any, updateButton: any): void {
   localStorage.setItem(PROGRAM_STORAGE_KEY, textArea.value);
   codeProvider.code = textArea.value;
   updateButton.disabled = true;
@@ -46,8 +49,7 @@ function updateCode(codeProvider: { code: any }, textArea: any, updateButton: an
   const textArea = document.getElementById('editor') as any;
   const testMidiButton = document.getElementById('testMidiButton');
 
-  let player: Player;
-  let codeProvider = {code: textArea.value};
+  codeProvider.code = textArea.code;
 
   buildMidiOutputOptions(midiOutputSelect, midiAccess);
   restoreFromLocaleStorage(textArea, midiOutputSelect, midiAccess);
@@ -67,10 +69,11 @@ function updateCode(codeProvider: { code: any }, textArea: any, updateButton: an
       player = null;
     } else {
       startButton.innerText = 'Stop';
+      const clockFn = () => performance.now() / 1000;
       player = Player.create({
         codeProvider,
-        clockFn: () => performance.now() / 1000,
-        processors: [new MidiProcessor(midiOutput)],
+        clockFn,
+        processors: [new MidiProcessor(midiOutput, clockFn)],
         entryPoint: 'Root'
       });
 
@@ -82,15 +85,15 @@ function updateCode(codeProvider: { code: any }, textArea: any, updateButton: an
 
   textArea.oninput = () => updateButton.disabled = false;
 
+  updateButton.onclick = () => updateCode(textArea, updateButton);
+
   midiOutputSelect.oninput = debounce(() => {
     localStorage.setItem(OUTPUT_STORAGE_KEY, midiOutputSelect.value);
   });
 
-  updateButton.onclick = () => updateCode(codeProvider, textArea, updateButton);
-
   window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.code === 'KeyS') {
-      updateCode(codeProvider, textArea, updateButton);
+      updateCode(textArea, updateButton);
       event.preventDefault();
     }
 

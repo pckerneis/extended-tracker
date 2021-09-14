@@ -10,9 +10,11 @@ export interface CodeProvider {
 }
 
 export interface MessageProcessor {
+  player?: Player;
   process?: (time: number, headId: string, messages: any[]) => void;
   headEnded?: (headId: string) => void;
   ended?: () => void;
+  started?: () => void;
   stopped?: () => void;
 }
 
@@ -22,6 +24,8 @@ export interface PlayerOptions {
   processors: MessageProcessor[];
   clockFn: () => number;
 }
+
+export type ClockFunction = () => number;
 
 export class Player {
   protected _lookAhead: number = 0.1;
@@ -35,6 +39,14 @@ export class Player {
   private _stopped: boolean = true;
   private _intervalMs: number = 10;
 
+  public get startTime(): number {
+    return this._startTime;
+  }
+
+  public get stopped(): boolean {
+    return this._stopped;
+  }
+
   public set speed(speed: number) {
     if (speed > 0) {
       this._speed = speed;
@@ -45,16 +57,16 @@ export class Player {
     return this._speed;
   }
 
-  public get processors(): MessageProcessor[] {
+  public get processors(): ReadonlyArray<MessageProcessor> {
     return this._messageProcessors;
   }
 
-  public get expressions(): Expr[] {
+  public get expressions(): ReadonlyArray<Expr> {
     if (this.codeProvider.code !== this._latestEvaluatedCode) {
       this._latestEvaluatedCode = this.codeProvider.code;
       try {
         this._exprs = Parser.parse(Scanner.scan(this.codeProvider.code));
-      } catch(e) {
+      } catch (e) {
         console.error(e);
       }
     }
@@ -63,8 +75,9 @@ export class Player {
   }
 
   protected constructor(private readonly codeProvider: CodeProvider,
-                        private readonly clock: () => number,
+                        private readonly clock: ClockFunction,
                         private readonly _messageProcessors: MessageProcessor[]) {
+    _messageProcessors.forEach(p => p.player = this);
   }
 
   public static create(options: PlayerOptions): Player {
@@ -100,7 +113,7 @@ export class Player {
   }
 
   public start(entryPoint: string): void {
-    if (! this._stopped) {
+    if (!this._stopped) {
       this.stop();
     }
 
@@ -110,25 +123,23 @@ export class Player {
       entryPoint,
       1,
       () => {
-        this._messageProcessors
-          .filter(processor => typeof processor.ended === 'function')
-          .forEach(processor => processor.ended());
-
+        forEachCall(this._messageProcessors, 'ended');
         this._hasReachedEnd = true;
       });
 
     this._startTime = this.clock();
     this._hasReachedEnd = false;
     this._stopped = false;
+
+    forEachCall(this._messageProcessors, 'started');
+
     this.next();
   }
-  
+
   public stop(): void {
-    if (! this._stopped) {
+    if (!this._stopped) {
       this._stopped = true;
-      this._messageProcessors
-        .filter(processor => typeof processor.stopped === 'function')
-        .forEach(processor => processor.stopped());
+      forEachCall(this._messageProcessors, 'stopped');
     }
   }
 
@@ -137,9 +148,7 @@ export class Player {
   }
 
   public post(time: number, headId: string, messages: any[]): void {
-    this._messageProcessors
-      .filter(processor => typeof processor.process === 'function')
-      .forEach(processor => processor.process(time, headId, messages));
+    forEachCall(this._messageProcessors, 'process', time, headId, messages);
   }
 
   public rootEnv(): any {
@@ -175,4 +184,12 @@ export class Player {
       setTimeout(() => this.next(), this._intervalMs);
     }
   }
+}
+
+function forEachCall<T>(items: T[], method: keyof T, ...args: any[]): void {
+  items.forEach(item => {
+    if (typeof item[method] === 'function') {
+      (item[method] as any)(...args);
+    }
+  });
 }
