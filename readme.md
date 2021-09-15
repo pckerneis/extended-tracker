@@ -22,13 +22,15 @@ Root = [
 ]
 ```
 
+An overview of the language can be found [here](language.md).
+
 ## Install
 
 With NodeJS installed, follow these steps:
 
 ```
-git clone <REPOSITORY_URL>
-cd <REPOSITORY_NAME>
+git clone https://github.com/pckerneis/extended-tracker
+cd extended-tracker
 npm install
 ```
 
