@@ -1,0 +1,18 @@
+Seq(offset) = [
+    $ player speed: (50 + randf() * 50) / 60
+    $ head stepDuration: 1/2
+
+    p: offset + 69, v: randf() * 80
+    , | p: offset + 64, v: randf() * 60
+    , | , | p: offset + 76, v: randf() * 60
+    $ head stepDuration: 2 + randf() * 3
+    , | , | ,
+    - | , | ,
+    - | - | ,
+]
+
+Root = [
+    # start
+    {Seq(offset: randf() * 10)}
+    @ start
+]

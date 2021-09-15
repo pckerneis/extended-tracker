@@ -1,7 +1,7 @@
 import {Parser} from '../parser/Parser';
 import {Scanner} from '../scanner/Scanner';
 import {Assign, AstNodeKind, Expr} from '../parser/Ast';
-import {EventQueue} from '../scheduler/EventQueue';
+import {EventQueue} from '../events/EventQueue';
 import {Head} from './Head';
 import {Interpreter} from './Interpreter';
 import {ErrorReporter} from '../error/ErrorReporter';

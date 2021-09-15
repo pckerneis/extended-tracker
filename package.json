@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "start-node": "tsc && node .",
+    "start": "tsc && node .",
     "build-web": "webpack"
   },
   "author": "pckerneis",

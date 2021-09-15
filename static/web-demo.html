@@ -13,14 +13,34 @@
 </div>
 <textarea id="editor" spellcheck="false">
 Root = [
-    p: 69, v: 100
-    p: 69, v: 100
-    p: 69, v: 100
+    # start
+    $ player speed: 100 / 60
+    $ head stepDuration: 1/2
+
+    p: 69, v: 80
+    p: 64, v: 60
+    p: 76, v: 60
+    ,
+    ,
     -
-    p: 69, v: 100
-    p: 69, v: 100
-    p: 69, v: 100
-    -
+
+    $ player speed: 94 / 60
+    p: 61, v: 30 | p: 56, v: 10
+    ,            | ,
+    ,            | ,            | p: 40, v: 20
+    ,            | ,            | ,
+    ,            | ,            | p: 33, v: 50
+    ,            | ,            | ,
+    ,            | ,            | ,
+    ,            | ,            | ,
+    -            | ,            | ,
+                 | -            | ,
+                 |              | ,
+
+    $ head stepDuration: 8
+    p: 83, v: 30 | p: 87, v: 10 | p: 92, v: 10
+
+    @ start
 ]
 </textarea>
 <div>

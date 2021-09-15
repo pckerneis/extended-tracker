@@ -1,6 +1,6 @@
 import {MidiOutput} from '../midi/MidiOutput';
 import {ClockFunction, MessageProcessor, Player} from './Player';
-import {EventQueue} from '../scheduler/EventQueue';
+import {EventQueue} from '../events/EventQueue';
 
 export class MidiProcessor implements MessageProcessor {
   player?: Player;
