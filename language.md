@@ -1,5 +1,24 @@
 # Musical language design notes
 
+## Structure of a program
+
+A program is a list of declarations.
+
+```
+Tempo = (...)
+SequenceA = (...)
+SequenceB = (...)
+Root = (...)
+```
+
+A declaration is an identifier, optional arguments and a value expression.
+
+```
+SequenceA     (velocity)         = [ p: 13, v: velocity; p: 18; p: 14; - ]
+^ Identifier  ^ Argument list      ^ Value
+          
+```
+
 ## Comments
 
 ```
@@ -43,7 +62,7 @@ t > 10 ? 123 : 321
 
 ## Sequence
 
-A sequence is a list of steps between brackets.
+A sequence is a list of steps between brackets (`[]`). Sequence steps are read one at the time by a player head.
 
 ```
 seq = [
@@ -68,7 +87,9 @@ seq = [ p:36, v:80 ; - ; p:38, v:80 ; - ; p:36, v:80 ; p:36, v:80 ; p:38, v:80 ;
 
 ### Nested sequences
 
-Sequences can be nested inside another with the curly brackets. They are played one at the time.
+Sequences can be nested inside another with the curly brackets (`{}`).
+
+When the player head reaches the end of a nested sequence, it returns to the parent sequence, reading the next available step.
 
 ```
 seqA = [
@@ -113,6 +134,42 @@ Sequence = [
 ```
 
 Voices allow for multiple notes to be played at the same time.
+
+## Messages
+
+A message is a list of coma-separated key-value pairs. A key and a value is delimited by a colon.
+
+```
+p: 60, v: 117
+```
+
+The value can be omitted, in which case the implicit value is the current value, if any, that have the same key in the current environment. If the key is unknown, the value is undefined.
+
+```
+Sequence(v) = [ p: 60, v ]
+```
+
+## Sequence operators
+
+### `||` any
+
+The `any` (`||`) logical operator allows to play two sequences simultaneously.
+
+```
+Root = [...] || [...]
+```
+
+When a player head reaches a `any` operator, it creates two child heads. The parent head waits until *any* of the child heads terminates before continuing.
+
+### `&&` all
+
+The `all` (`&&`) logical operator allows to play two sequences simultaneously.
+
+```
+Root = [...] && [...]
+```
+
+When a player head reaches a `all` operator, it creates two child heads. The parent head waits until *all* of the child heads terminate before continuing.
 
 ## Conditional branching
 
