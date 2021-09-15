@@ -1,6 +1,6 @@
 # extended-tracker
 
-`extended-tracker` is a declarative language and a suite of tools for interactive music and live coding.
+`extended-tracker` (temporary name) is a declarative language and a suite of tools for interactive music and live coding.
 
 Drawing its inspiration from music trackers, it allows describing MIDI note sequences in a human-readable syntax.
 
