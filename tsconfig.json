@@ -16,6 +16,6 @@
       "typeRoots": [ "../node_modules/@types" ],
       "outDir": "dist/node/"
     },
-    "include": [ "src/common/**/*", "src/node/**/*" ],
+    "include": [ "src/common/**/*", "src/node/**/*", "src/ws/**/*" ],
     "exclude": [ "node_modules" ]
 }

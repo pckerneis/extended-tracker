@@ -1,0 +1,22 @@
+- [ ] Jump to sequence
+- [ ] Jump to sequence with flag
+- [ ] Inner sequence with flag
+- [x] Scheduling
+- [x] Empty messages (,)
+- [x] What about empty tracks ? e.g '- | | ,' *=> valid*
+- [x] Arithmetic operations
+- [x] Ternary condition
+- [x] Set BPM / Speed (control message)
+- [x] Set time sub division (control message)
+- [x] Control messages scope
+- [x] Sequence operators
+- [x] Sequence operators precedence? *=> left to right*
+- [x] Sequence processors
+- [x] Ternary condition step
+- [ ] "left" sequence operator
+- [ ] "right" sequence operator ?
+- [x] Parametrized sequences
+- [x] Entry point name as node option
+- [ ] References (head, player, parent)
+- [ ] Built-in step constants
+- [ ] Pitch string parsing ?

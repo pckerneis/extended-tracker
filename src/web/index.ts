@@ -1,14 +1,17 @@
 import {WebMidiOutput} from '../common/midi/WebMidiOutput';
+import {WebSocketMidiOutput} from '../common/midi/WebSocketMidiOutput';
 import {Player} from '../common/player/Player';
 import {MidiProcessor} from '../common/player/MidiProcessor';
 import {defaultErrorReporter} from '../common/error/ErrorReporter';
+import { MidiOutput } from '../common/midi/MidiOutput';
 
 const PROGRAM_STORAGE_KEY = '_WEB_PLAYER_PROGRAM_987654321';
 const OUTPUT_STORAGE_KEY = '_WEB_PLAYER_MIDI_OUTPUT_987654321';
 
 let midiOutput: any = null;
-let player: Player;
+let player: Player | null = null;
 const codeProvider = {code: ''};
+let wsOutput: MidiOutput;
 
 function buildMidiOutputOptions(midiOutputSelect: any, midiAccess: any): void {
   const noneOption = midiOutputSelect.appendChild(document.createElement('option'));
@@ -45,14 +48,15 @@ function updateCode(textArea: any, updateButton: any): void {
 
 (navigator as any).requestMIDIAccess().then((midiAccess: any) => {
   const startButton = document.getElementById('startButton') as any;
-  const updateButton = document.getElementById('updateButton') as any;
-  const midiOutputSelect = document.getElementById('midiOutput') as any;
+  const updateButton = document.getElementById('updateButton') as HTMLButtonElement;
+  const midiOutputSelect = document.getElementById('midiOutput') as HTMLSelectElement;
   const textArea = document.getElementById('editor') as any;
-  const testMidiButton = document.getElementById('testMidiButton');
+  const testMidiButton = document.getElementById('testMidiButton') as HTMLButtonElement;
 
   codeProvider.code = textArea.code;
 
   buildMidiOutputOptions(midiOutputSelect, midiAccess);
+  initialiseWebSocketPort(midiOutputSelect);
   restoreFromLocaleStorage(textArea, midiOutputSelect, midiAccess);
 
   testMidiButton.onclick = () => {
@@ -60,7 +64,11 @@ function updateCode(textArea: any, updateButton: any): void {
   };
 
   midiOutputSelect.onchange = () => {
-    midiOutput = new WebMidiOutput(midiAccess.outputs.get(midiOutputSelect.value));
+    if (midiOutputSelect.value == "WebSocket") {
+      midiOutput = wsOutput;
+    } else {
+      midiOutput = new WebMidiOutput(midiAccess.outputs.get(midiOutputSelect.value));
+    }
   };
 
   function stopped(): void {
@@ -80,7 +88,7 @@ function updateCode(textArea: any, updateButton: any): void {
         codeProvider,
         clockFn,
         processors: [
-          new MidiProcessor(midiOutput, clockFn),
+          new MidiProcessor(midiOutput ?? wsOutput, clockFn),
           {
             stopped: () => stopped(),
             ended: () => stopped(),
@@ -126,13 +134,41 @@ function debounce(func: Function, timeout = 300){
 }
 
 function sendMiddleC(midiAccess: any, portID: string) {
-  const output = midiAccess.outputs.get(portID);
+  let output: MidiOutput;
+
+  if (portID === 'WebSocket' && wsOutput != null) {
+    output = wsOutput;
+  } else {
+    output = midiAccess.outputs.get(portID);
+  }
 
   if (output) {
-    output.send([0x90, 60, 100]);
+    output.noteOn(60, 100, 1);
 
     setTimeout(() => {
-      output.send([176, 120, 0]);
+      output.noteOff(60, 0, 1);
     }, 500);
   }
+}
+
+function initialiseWebSocketPort(midiOutputSelect: HTMLSelectElement) {
+  const connection = new WebSocket('ws://localhost:9000');
+
+  connection.onopen = function () {
+    const wsOption = midiOutputSelect.appendChild(document.createElement('option'));
+    wsOption.innerText = 'WebSocket';
+    wsOption.value = 'WebSocket';
+
+    wsOutput = new WebSocketMidiOutput(connection);
+  };
+
+  // Log errors
+  connection.onerror = (error) => console.error(error);
+
+  connection.onmessage = async (e) => {
+    // Nothing to do here...
+    const text = await e.data.text();
+    console.log(text);
+    console.log('message received.', JSON.parse(text));
+  };
 }
