@@ -18,7 +18,7 @@ export class Head {
   private constructor(id: string,
                       public readonly player: Player,
                       private readonly _parentHead: Head,
-                      private _ended: Function) {
+                      private _ended: (head: Head) => void) {
     this.id = id + (LATEST_ID++);
     this._nextTime = _parentHead?._nextTime ?? 0;
     this._stepLength = _parentHead?._stepLength ?? 1;
@@ -32,13 +32,13 @@ export class Head {
   public static start(player: Player,
                       sequenceName: string,
                       stepLength: number,
-                      ended: Function): Head {
+                      ended: (head: Head) => void): Head {
     const head = new Head('root', player, null, ended);
     head.readRootSequence(sequenceName);
     return head;
   }
 
-  private static nested(id: string, parent: Head, expr: Expr, ended: () => void): Head {
+  private static nested(id: string, parent: Head, expr: Expr, ended: (head: Head) => void): Head {
     const head = new Head(`${parent.id}/${id}`, parent.player, parent, ended);
     head.readSequence(expr);
     return head;
@@ -219,8 +219,8 @@ export class Head {
   }
 
   private innerSequence(maybeSequence: Expr): void {
-    const nested = Head.nested('nested', this, maybeSequence, () => {
-      this._nextTime = nested._nextTime;
+    const nested = Head.nested('nested', this, maybeSequence, (nestedHead) => {
+      this._nextTime = nestedHead._nextTime;
       this.readNextStep();
     });
   }
@@ -228,7 +228,7 @@ export class Head {
   private end(): void {
     this.player.processors.filter(p => typeof p.headEnded === 'function')
       .forEach(processor => processor.headEnded(this.id));
-    this._ended();
+    this._ended(this);
   }
 
   private controlMessage(message: Control): void {
